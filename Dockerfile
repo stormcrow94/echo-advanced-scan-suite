@@ -27,23 +27,27 @@ ENV GOPATH="/opt/go"
 ENV PATH="${GOPATH}/bin:${PATH}"
 
 # Install Go tools to /opt/go/bin
-RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-RUN go install -v github.com/tomnomnom/assetfinder@latest
-RUN go install -v github.com/owasp-amass/amass/v4/...@latest
-RUN go install -v github.com/tomnomnom/anew@latest
-RUN go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
-RUN go install -v github.com/lc/gau/v2/cmd/gau@latest
-RUN go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
-RUN go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-RUN go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
-RUN go install -v github.com/003random/getJS@latest
-RUN go install -v github.com/tomnomnom/waybackurls@latest
+# Install Go tools to /opt/go/bin
+RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+    go install -v github.com/tomnomnom/assetfinder@latest && \
+    go install -v github.com/owasp-amass/amass/v4/...@latest && \
+    go install -v github.com/tomnomnom/anew@latest && \
+    go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
+    go install -v github.com/lc/gau/v2/cmd/gau@latest && \
+    go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
+    go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
+    go install -v github.com/003random/getJS@latest && \
+    go install -v github.com/tomnomnom/waybackurls@latest
 
 # Install findomain
 RUN wget -q https://github.com/Findomain/Findomain/releases/download/10.0.1/findomain-linux.zip && \
     unzip findomain-linux.zip && \
     mv findomain /usr/local/bin/ && \
     rm findomain-linux.zip
+
+# Update Nuclei templates
+RUN nuclei -update-templates
 
 # Make Go binaries accessible to all users
 RUN chmod -R 755 /opt/go
