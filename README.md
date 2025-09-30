@@ -1,5 +1,11 @@
 # ECHO - Advanced Scan Suite
 
+[English](#english) | [Português](#português)
+
+---
+
+## English
+
 An automated reconnaissance scanner built with Docker for comprehensive security assessment and information gathering.
 
 ## Features
@@ -151,3 +157,159 @@ This project is provided as-is for educational and authorized security testing p
 ## Disclaimer
 
 This tool is for educational and ethical testing purposes only. Users are responsible for complying with applicable laws and regulations. The authors are not responsible for any misuse or damage caused by this tool.
+
+---
+
+## Português
+
+Um scanner de reconhecimento automatizado construído com Docker para avaliação de segurança abrangente e coleta de informações.
+
+## Funcionalidades
+
+- **Enumeração de Subdomínios**: Descobre subdomínios usando múltiplas ferramentas (subfinder, assetfinder, findomain, amass)
+- **Resolução DNS**: Valida e resolve subdomínios descobertos com dnsx
+- **Varredura de Portas**: Escaneia as 1000 portas principais usando naabu
+- **Detecção de Hosts Ativos**: Identifica servidores web ativos com httpx
+- **Coleta de URLs**: Reúne URLs históricas do Wayback Machine e outras fontes
+- **Análise de JavaScript**: Extrai endpoints de arquivos JavaScript usando getJS
+- **Varredura de Vulnerabilidades**: Detecção abrangente de vulnerabilidades com Nuclei
+
+## Pré-requisitos
+
+- Docker instalado no seu sistema
+- Espaço em disco suficiente para os resultados das varreduras
+- Conectividade de rede para ferramentas de reconhecimento externas
+
+## Instalação
+
+1. Clone o repositório:
+```bash
+git clone https://github.com/stormcrow94/echo-advanced-scan-suite.git
+cd echo-advanced-scan-suite
+```
+
+2. Construa a imagem Docker:
+```bash
+docker build -t echo-scanner .
+```
+
+## Uso
+
+Execute uma varredura contra um domínio alvo:
+
+```bash
+docker run --rm -v $(pwd)/output:/app/output echo-scanner -d exemplo.com
+```
+
+### Opções de Comando
+
+- `-d, --domain`: Domínio alvo para reconhecimento (obrigatório)
+- `--install`: Instala todas as ferramentas e dependências (para instalação local)
+- `-h, --help`: Mostra mensagem de ajuda
+
+### Exemplo
+
+```bash
+docker run --rm -v $(pwd)/output:/app/output echo-scanner -d exemplo.com
+```
+
+Os resultados serão salvos em `./output/recon-exemplo.com-YYYY-MM-DD/`
+
+## Estrutura de Saída
+
+```
+output/
+└── recon-exemplo.com-YYYY-MM-DD/
+    ├── recon.log              # Log completo de execução
+    ├── subdomains.txt         # Todos os subdomínios descobertos
+    ├── urls.txt               # URLs históricas coletadas
+    ├── hosts/
+    │   ├── resolved.txt       # Subdomínios resolvidos via DNS
+    │   ├── ports.txt          # Portas abertas descobertas
+    │   └── alive.txt          # Servidores web ativos
+    ├── js/
+    │   └── endpoints.txt      # Endpoints extraídos do JavaScript
+    └── vulns/
+        └── nuclei.txt         # Resultados da varredura Nuclei
+```
+
+## Ferramentas Incluídas
+
+- **subfinder** - Ferramenta rápida de descoberta de subdomínios
+- **assetfinder** - Encontra domínios e subdomínios
+- **findomain** - Enumerador de subdomínios multiplataforma
+- **amass** - Enumeração DNS aprofundada e mapeamento de rede
+- **dnsx** - Resolvedor DNS rápido
+- **naabu** - Ferramenta de varredura de portas
+- **httpx** - Kit de ferramentas HTTP para detecção de hosts web
+- **waybackurls** - Busca URLs do Wayback Machine
+- **gau** - Obtém todas as URLs de múltiplas fontes
+- **getJS** - Análise de arquivos JavaScript
+- **nuclei** - Scanner de vulnerabilidades com templates
+
+## Etapas da Varredura
+
+O scanner executa as seguintes etapas automaticamente:
+
+1. **Enumeração de Subdomínios** - Descobre subdomínios usando múltiplas ferramentas
+2. **Resolução DNS** - Valida quais subdomínios são resolvidos
+3. **Varredura de Portas** - Escaneia as 1000 portas principais nos hosts resolvidos
+4. **Detecção de Servidores Web** - Identifica serviços HTTP/HTTPS ativos
+5. **Coleta de URLs** - Reúne URLs históricas do Wayback Machine e outras fontes
+6. **Análise de JavaScript** - Extrai endpoints de arquivos JavaScript
+7. **Varredura de Vulnerabilidades** - Executa Nuclei para detectar problemas de segurança
+
+## Instalação Local (Sem Docker)
+
+Se você preferir instalar as ferramentas localmente:
+
+```bash
+chmod +x recon.sh
+./recon.sh --install
+```
+
+Depois execute as varreduras diretamente:
+```bash
+./recon.sh -d exemplo.com
+```
+
+## Notas de Segurança
+
+- Esta ferramenta é destinada apenas para avaliações de segurança autorizadas
+- Sempre obtenha autorização adequada antes de escanear qualquer domínio
+- Respeite limites de taxa e termos de serviço de APIs externas
+- Algumas ferramentas podem acionar sistemas IDS/IPS
+
+## Dicas de Performance
+
+- As varreduras podem levar de 10 a 30 minutos dependendo do tamanho do alvo
+- Varredura de portas e varredura de vulnerabilidades com Nuclei são as fases mais demoradas
+- Use o volume mount do Docker para preservar resultados entre execuções
+- Ajuste valores de timeout no script para varreduras mais rápidas se necessário
+
+## Solução de Problemas
+
+**Problemas de Permissão:**
+```bash
+sudo chown -R $USER:$USER output/
+```
+
+**Erros de Build do Docker:**
+- Certifique-se de ter uma conexão estável com a internet
+- Algumas instalações de pacotes Go podem levar tempo
+
+**Timeouts de Varredura:**
+- Normal para alvos grandes com muitos subdomínios
+- Resultados até o ponto de timeout ainda são salvos
+
+## Contribuindo
+
+Contribuições são bem-vindas! Sinta-se à vontade para enviar issues ou pull requests.
+
+## Licença
+
+Este projeto é fornecido como está para fins educacionais e testes de segurança autorizados.
+
+## Aviso Legal
+
+Esta ferramenta é apenas para fins educacionais e testes éticos. Os usuários são responsáveis por cumprir as leis e regulamentos aplicáveis. Os autores não são responsáveis por qualquer uso indevido ou danos causados por esta ferramenta.
