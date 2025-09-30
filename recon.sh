@@ -30,10 +30,9 @@ export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
 # #############################################################################
 
 # === CONFIGURAÇÕES GERAIS E CORES ===
-# Note: set -e removed to allow scan to continue even if individual tools fail
-set -o pipefail
+set -eo pipefail
 
-# Garante que o PATH inclua os diretórios do Go para a sessão atual do script
+# Garante que o PATH inclua os diretórios do Go
 export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
 
 GREEN="\e[32m"
@@ -50,170 +49,31 @@ function print_banner() {
     echo -e "${BLUE}${BOLD}=======================================================================${RESET}"
 }
 
-# Função de ajuda
+# Função de ajuda simplificada
 function usage() {
-    echo -e "${YELLOW}Uso: $0 -d <DOMÍNIO> [OPÇÕES]${RESET}"
-    echo "Opções:"
+    echo -e "${YELLOW}Uso: $0 -d <DOMÍNIO>${RESET}"
     echo "  -d, --domain    O domínio alvo para o reconhecimento."
-    echo "      --install   Instala todas as ferramentas e dependências necessárias."
-    echo "  -h, --help      Mostra esta mensagem de ajuda."
     exit 1
 }
 
-# === FUNÇÃO DE INSTALAÇÃO DE DEPENDÊNCIAS ===
-function install_dependencies() {
-    print_banner "Iniciando a Instalação de Dependências"
-
-    # Verifica se o usuário é root
-    if [ "$EUID" -eq 0 ]; then
-        echo -e "${YELLOW}[!] Aviso: Recomenda-se executar a instalação como um usuário normal com privilégios sudo.${RESET}"
-        echo -e "${YELLOW}[!] O Go será instalado no diretório do usuário que executa o script.${RESET}"
-    fi
-
-    # Verifica se o Go está instalado
-    if ! command -v go &> /dev/null; then
-        echo -e "${YELLOW}[!] Go não encontrado. Instalando...${RESET}"
-        (
-            cd /tmp || exit
-            wget -q https://go.dev/dl/go1.22.4.linux-amd64.tar.gz
-            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
-            echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> ~/.bashrc
-        )
-        echo -e "${GREEN}[✔] Go instalado com sucesso.${RESET}"
-    else
-        echo -e "${GREEN}[✔] Go já está instalado.${RESET}"
-    fi
-
-    # Detecta o gerenciador de pacotes
-    # if command -v apt-get &> /dev/null; then
-    #     PKG_MANAGER="sudo apt-get install -y"
-    #     ${PKG_MANAGER} git wget curl jq nmap libpcap-dev
-    # elif command -v dnf &> /dev/null; then
-    #     PKG_MANAGER="sudo dnf install -y"
-    #     ${PKG_MANAGER} git wget curl jq nmap libpcap-devel
-    # elif command -v yum &> /dev/null; then
-    #     PKG_MANAGER="sudo yum install -y"
-    #     ${PKG_MANAGER} git wget curl jq nmap libpcap-devel
-    # else
-    #     echo -e "${RED}[✖] Gerenciador de pacotes não suportado. Instale as ferramentas manualmente.${RESET}"
-    #     exit 1
-    # fi
-
-    echo -e "${GREEN}[✔] Dependências base (git, wget, curl, jq, nmap) instaladas.${RESET}"
-
-    # Lista de ferramentas para instalar via Go
-    tools=(
-        "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
-        "github.com/tomnomnom/assetfinder@latest"
-        "github.com/owasp-amass/amass/v4/cmd/amass@master"
-        "github.com/tomnomnom/anew@latest"
-        "github.com/projectdiscovery/dnsx/cmd/dnsx@latest"
-        "github.com/tomnomnom/waybackurls@latest"
-        "github.com/lc/gau/v2/cmd/gau@latest"
-        "github.com/projectdiscovery/httpx/cmd/httpx@latest"
-        "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
-        "github.com/projectdiscovery/naabu/v2/cmd/naabu@latest"
-        "github.com/003random/getJS@latest"
-        "github.com/devanshbatham/paramspider@latest"
-    )
-
-    for tool in "${tools[@]}"; do
-        tool_name=$(basename "$tool" | cut -d '@' -f 1)
-        if ! command -v "$tool_name" &> /dev/null; then
-            echo -e "${YELLOW}[!] Instalando $tool_name...${RESET}"
-            go install -v "$tool"
-        else
-            echo -e "${GREEN}[✔] $tool_name já está instalado.${RESET}"
-        fi
-    done
-
-    # Instala o findomain
-    if ! command -v findomain &> /dev/null; then
-        echo -e "${YELLOW}[!] Instalando findomain...${RESET}"
-        cd /tmp || exit
-        wget -q https://github.com/Findomain/Findomain/releases/download/10.0.1/findomain-linux.zip
-        unzip findomain-linux.zip
-        sudo mv findomain /usr/local/bin/
-        rm findomain-linux.zip
-        cd -
-    else
-        echo -e "${GREEN}[✔] findomain já está instalado.${RESET}"
-    fi
-
-    # Atualiza os templates do Nuclei
-    echo -e "${YELLOW}[!] Atualizando templates do Nuclei...${RESET}"
-    nuclei -update-templates
-
-    echo -e "\n${GREEN}${BOLD}Instalação concluída! Por favor, execute 'source ~/.bashrc' ou abra um novo terminal para que o PATH seja atualizado.${RESET}"
-    exit 0
-}
-
-# === FUNÇÃO PARA VERIFICAR SE AS FERRAMENTAS EXISTEM ===
-function check_tools() {
-    print_banner "Verificando se as ferramentas necessárias existem"
-    local missing_tools=0
-    # Ferramentas que serão usadas no scan
-    required_tools=(
-        "subfinder" "assetfinder" "findomain" "amass" "anew" "dnsx"
-        "naabu" "httpx" "waybackurls" "gau" "getJS" "nuclei"
-    )
-
-    for tool in "${required_tools[@]}"; do
-        if ! command -v "$tool" &> /dev/null; then
-            echo -e "${RED}[✖] Ferramenta '${tool}' não encontrada.${RESET}"
-            missing_tools=1
-        fi
-    done
-
-    if [ ${missing_tools} -eq 1 ]; then
-        echo -e "\n${YELLOW}[!] Uma ou mais ferramentas estão faltando.${RESET}"
-        echo -e "${YELLOW}[!] Por favor, execute o script com a flag '--install' para instalá-las.${RESET}"
-        exit 1
-    fi
-    echo -e "${GREEN}[✔] Todas as ferramentas necessárias foram encontradas.${RESET}"
-}
-
-
 # === PROCESSAMENTO DOS ARGUMENTOS DA LINHA DE COMANDO ===
 DOMAIN=""
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -d|--domain) DOMAIN="$2"; shift ;;
-        --install) install_dependencies ;;
-        -h|--help) usage ;;
-        *) echo "Opção desconhecida: $1"; usage ;;
-    esac
-    shift
-done
-
-# Checagem de segurança: não rodar o scan como root
-if [ "$EUID" -eq 0 ] && [[ "$1" != "--install" ]]; then
-  echo -e "${RED}[✖] Erro: Por razões de segurança, não execute o scan de reconhecimento como usuário root.${RESET}"
-  exit 1
-fi
-
-if [ -z "$DOMAIN" ]; then
-    # Se o domínio for vazio, mas a flag --install não foi passada, mostre o erro.
-    # Isso evita que a mensagem de erro apareça quando o objetivo é apenas instalar.
-    if [[ "$1" != "--install" ]]; then
-        echo -e "${RED}[✖] Erro: O domínio é obrigatório.${RESET}"
-        usage
-    fi
+if [[ "$#" -eq 2 && ("$1" == "-d" || "$1" == "--domain") ]]; then
+    DOMAIN="$2"
+else
+    usage
 fi
 
 # === INÍCIO DO SCRIPT DE RECONHECIMENTO ===
-# Verifica as ferramentas antes de criar diretórios e começar o scan
-check_tools
-
-# Create output directory (can be mounted from host)
+# Cria o diretório de saída principal
 mkdir -p /app/output
-cd /app/output
+cd /app/output || exit
 
 OUTPUT_DIR="recon-$DOMAIN-$(date +%F)"
 mkdir -p "$OUTPUT_DIR"/{urls,hosts,vulns,js}
 
 LOG_FILE="$OUTPUT_DIR/recon.log"
-exec > >(tee -a ${LOG_FILE}) 2>&1
+exec > >(tee -a "${LOG_FILE}") 2>&1
 
 print_banner "Iniciando Recon para: $DOMAIN"
 echo -e "Resultados serão salvos em: ${BOLD}$OUTPUT_DIR${RESET}"
@@ -226,7 +86,14 @@ print_banner "ETAPA 1: Coletando Subdomínios"
     findomain -t "$DOMAIN" -q
     timeout 5m amass enum -passive -d "$DOMAIN" -nocolor -silent
 ) | sort -u | anew "$OUTPUT_DIR/subdomains.txt"
-echo -e "${GREEN}[✔] Subdomínios coletados: $(wc -l < "$OUTPUT_DIR/subdomains.txt")${RESET}"
+SUBDOMAIN_COUNT=$(wc -l < "$OUTPUT_DIR/subdomains.txt")
+echo -e "${GREEN}[✔] Subdomínios coletados: ${SUBDOMAIN_COUNT}${RESET}"
+
+# Verificação de robustez
+if [ "$SUBDOMAIN_COUNT" -eq 0 ]; then
+    echo -e "${RED}[✖] Nenhum subdomínio encontrado. O script será encerrado.${RESET}"
+    exit 1
+fi
 
 # 2️⃣ Resolução de DNS
 print_banner "ETAPA 2: Resolvendo Subdomínios Válidos"
@@ -241,7 +108,14 @@ echo -e "${GREEN}[✔] Escaneamento de portas concluído.${RESET}"
 # 4️⃣ Verificação de Servidores Web (hosts vivos)
 print_banner "ETAPA 4: Verificando Servidores Web Ativos"
 httpx -l "$OUTPUT_DIR/hosts/resolved.txt" -t 100 -silent -o "$OUTPUT_DIR/hosts/alive.txt"
-echo -e "${GREEN}[✔] Hosts vivos: $(wc -l < "$OUTPUT_DIR/hosts/alive.txt")${RESET}"
+ALIVE_HOSTS_COUNT=$(wc -l < "$OUTPUT_DIR/hosts/alive.txt")
+echo -e "${GREEN}[✔] Hosts vivos: ${ALIVE_HOSTS_COUNT}${RESET}"
+
+# Verificação de robustez
+if [ "$ALIVE_HOSTS_COUNT" -eq 0 ]; then
+    echo -e "${RED}[✖] Nenhum host ativo encontrado. O script será encerrado.${RESET}"
+    exit 1
+fi
 
 # 5️⃣ Coleta de URLs (Wayback Machine e GAU)
 print_banner "ETAPA 5: Coletando URLs de Fontes Históricas"
@@ -253,8 +127,15 @@ echo -e "${GREEN}[✔] URLs coletadas: $(wc -l < "$OUTPUT_DIR/urls.txt")${RESET}
 
 # 6️⃣ Análise de Arquivos JavaScript
 print_banner "ETAPA 6: Analisando Arquivos JavaScript em busca de Endpoints"
-grep '\.js$' "$OUTPUT_DIR/urls.txt" | httpx -status-code -mc 200 -content-type | grep 'javascript' | cut -d ' ' -f1 | getJS --complete > "$OUTPUT_DIR/js/endpoints.txt"
-echo -e "${GREEN}[✔] Endpoints extraídos de arquivos JS.${RESET}"
+JS_URLS_FILE="$OUTPUT_DIR/js/js_urls.txt"
+grep '\.js$' "$OUTPUT_DIR/urls.txt" | httpx -status-code -mc 200 -content-type | grep 'javascript' | cut -d ' ' -f1 > "$JS_URLS_FILE"
+
+if [ -s "$JS_URLS_FILE" ]; then
+    getJS --list "$JS_URLS_FILE" --complete > "$OUTPUT_DIR/js/endpoints.txt"
+    echo -e "${GREEN}[✔] Endpoints extraídos de arquivos JS.${RESET}"
+else
+    echo -e "${YELLOW}[!] Nenhum arquivo JavaScript encontrado para análise.${RESET}"
+fi
 
 # 7️⃣ Escaneamento de Vulnerabilidades com Nuclei
 print_banner "ETAPA 7: Escaneando Vulnerabilidades com Nuclei"
