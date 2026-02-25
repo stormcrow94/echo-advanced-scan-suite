@@ -102,10 +102,10 @@ echo -e "Resultados serão salvos em: ${BOLD}$OUTPUT_DIR${RESET}"
 # 1️⃣ Enumeração de Subdomínios (em paralelo)
 print_banner "ETAPA 1: Coletando Subdomínios"
 (
-    subfinder -d "$DOMAIN" -all -silent -t 50
-    assetfinder --subs-only "$DOMAIN"
-    findomain -t "$DOMAIN" -q
-    timeout 5m amass enum -passive -d "$DOMAIN" -nocolor -silent
+    subfinder -d "$DOMAIN" -all -silent -t 50 || true
+    assetfinder --subs-only "$DOMAIN" || true
+    findomain -t "$DOMAIN" -q || true
+    timeout 5m amass enum -passive -d "$DOMAIN" -nocolor -silent || true
 ) | sort -u | anew "$OUTPUT_DIR/subdomains.txt"
 SUBDOMAIN_COUNT=$(wc -l < "$OUTPUT_DIR/subdomains.txt")
 echo -e "${GREEN}[✔] Subdomínios coletados: ${SUBDOMAIN_COUNT}${RESET}"
@@ -143,18 +143,18 @@ fi
 # 5️⃣ Coleta de URLs (Wayback Machine e GAU)
 print_banner "ETAPA 5: Coletando URLs de Fontes Históricas"
 (
-    cat "$OUTPUT_DIR/hosts/alive.txt" | waybackurls
-    cat "$OUTPUT_DIR/hosts/alive.txt" | gau -b png,jpg,gif,svg,css,js,woff,woff2 -t 20
+    cat "$OUTPUT_DIR/hosts/alive.txt" | waybackurls || true
+    cat "$OUTPUT_DIR/hosts/alive.txt" | gau -b png,jpg,gif,svg,css,js,woff,woff2 -t 20 || true
 ) | sort -u | anew "$OUTPUT_DIR/urls.txt"
 echo -e "${GREEN}[✔] URLs coletadas: $(wc -l < "$OUTPUT_DIR/urls.txt")${RESET}"
 
 # 6️⃣ Análise de Arquivos JavaScript
 print_banner "ETAPA 6: Analisando Arquivos JavaScript em busca de Endpoints"
 JS_URLS_FILE="$OUTPUT_DIR/js/js_urls.txt"
-grep '\.js$' "$OUTPUT_DIR/urls.txt" | httpx -status-code -mc 200 -content-type | grep 'javascript' | cut -d ' ' -f1 > "$JS_URLS_FILE"
+{ grep '\.js$' "$OUTPUT_DIR/urls.txt" || true; } | httpx -status-code -mc 200 -content-type | { grep 'javascript' || true; } | cut -d ' ' -f1 > "$JS_URLS_FILE"
 
 if [ -s "$JS_URLS_FILE" ]; then
-    getJS --list "$JS_URLS_FILE" --complete > "$OUTPUT_DIR/js/endpoints.txt"
+    getJS --input "$JS_URLS_FILE" --complete > "$OUTPUT_DIR/js/endpoints.txt" || true
     echo -e "${GREEN}[✔] Endpoints extraídos de arquivos JS.${RESET}"
 else
     echo -e "${YELLOW}[!] Nenhum arquivo JavaScript encontrado para análise.${RESET}"
