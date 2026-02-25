@@ -4,8 +4,11 @@ FROM ubuntu:22.04
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (add universe for Nikto)
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository -y universe \
+    && apt-get update && apt-get install -y \
     git \
     wget \
     curl \
@@ -14,6 +17,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
     libpcap-dev \
     build-essential \
     unzip \
+    nikto \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go
@@ -52,11 +56,23 @@ RUN nuclei -update-templates
 # Make Go binaries accessible to all users
 RUN chmod -R 755 /opt/go
 
+# Build API server (before switching user so we can write binary)
+COPY go.mod ./
+COPY api/ ./api/
+RUN go build -o /app/api-server ./api
+
+# Entrypoint wrapper: "serve" -> API server, else -> recon.sh
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Copy the recon script into the container
 COPY recon.sh .
 
 # Make the script executable
 RUN chmod +x recon.sh
+
+# Expose API port when running in serve mode
+EXPOSE 8080
 
 # Create a non-privileged user
 RUN useradd -m -u 1000 recon && \
@@ -65,5 +81,6 @@ RUN useradd -m -u 1000 recon && \
 # Switch to non-privileged user
 USER recon
 
-# Set the entrypoint
-ENTRYPOINT ["/app/recon.sh"]
+# Set the entrypoint (serve -> API; otherwise -> recon.sh)
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD []

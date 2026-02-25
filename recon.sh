@@ -65,12 +65,33 @@ else
 fi
 
 # === INÍCIO DO SCRIPT DE RECONHECIMENTO ===
+# Configurações opcionais (time budget e ferramentas)
+NIKTO_MAX_HOSTS="${NIKTO_MAX_HOSTS:-10}"
+ZAP_MAX_HOSTS="${ZAP_MAX_HOSTS:-5}"
+ZAP_BASELINE_ENABLED="${ZAP_BASELINE_ENABLED:-false}"
+MAX_SCAN_MINUTES="${MAX_SCAN_MINUTES:-30}"
+
 # Cria o diretório de saída principal
 mkdir -p /app/output
 cd /app/output || exit
 
 OUTPUT_DIR="recon-$DOMAIN-$(date +%F)"
 mkdir -p "$OUTPUT_DIR"/{urls,hosts,vulns,js}
+
+# Marca início do scan para status.json
+STARTED_AT=$(date -Iseconds)
+echo "{\"started_at\": \"$STARTED_AT\", \"status\": \"running\"}" > "$OUTPUT_DIR/status.json"
+
+# Atualiza status para "failed" em saídas antecipadas (para a API retornar corretamente)
+write_status_failed() {
+    local reason="${1:-unknown}"
+    local finished
+    finished=$(date -Iseconds)
+    echo "{\"started_at\": \"$STARTED_AT\", \"finished_at\": \"$finished\", \"status\": \"failed\", \"error\": \"$reason\"}" > "$OUTPUT_DIR/status.json"
+}
+
+# Em qualquer saída com erro, marcar como failed se ainda estiver "running"
+trap 'if [ $? -ne 0 ] && [ -n "${OUTPUT_DIR:-}" ] && [ -f "${OUTPUT_DIR}/status.json" ]; then grep -q "\"status\": \"running\"" "${OUTPUT_DIR}/status.json" 2>/dev/null && write_status_failed "script error"; fi' EXIT
 
 LOG_FILE="$OUTPUT_DIR/recon.log"
 exec > >(tee -a "${LOG_FILE}") 2>&1
@@ -92,6 +113,7 @@ echo -e "${GREEN}[✔] Subdomínios coletados: ${SUBDOMAIN_COUNT}${RESET}"
 # Verificação de robustez
 if [ "$SUBDOMAIN_COUNT" -eq 0 ]; then
     echo -e "${RED}[✖] Nenhum subdomínio encontrado. O script será encerrado.${RESET}"
+    write_status_failed "no subdomains found"
     exit 1
 fi
 
@@ -114,6 +136,7 @@ echo -e "${GREEN}[✔] Hosts vivos: ${ALIVE_HOSTS_COUNT}${RESET}"
 # Verificação de robustez
 if [ "$ALIVE_HOSTS_COUNT" -eq 0 ]; then
     echo -e "${RED}[✖] Nenhum host ativo encontrado. O script será encerrado.${RESET}"
+    write_status_failed "no alive hosts found"
     exit 1
 fi
 
@@ -139,10 +162,55 @@ fi
 
 # 7️⃣ Escaneamento de Vulnerabilidades com Nuclei
 print_banner "ETAPA 7: Escaneando Vulnerabilidades com Nuclei"
-nuclei -l "$OUTPUT_DIR/hosts/alive.txt" -t "technologies,cves,cnvd,default-logins,misconfigurations,vulnerabilities" -severity low,medium,high,critical -o "$OUTPUT_DIR/vulns/nuclei.txt"
+# Text output
+timeout 10m nuclei -l "$OUTPUT_DIR/hosts/alive.txt" \
+    -t "technologies,cves,cnvd,default-logins,misconfigurations,vulnerabilities,exposure,takeover,exposed-panels,secret" \
+    -severity low,medium,high,critical \
+    -c 25 -rl 150 -timeout 5 \
+    -o "$OUTPUT_DIR/vulns/nuclei.txt" 2>/dev/null || true
+# JSON output (same templates)
+timeout 10m nuclei -l "$OUTPUT_DIR/hosts/alive.txt" \
+    -t "technologies,cves,cnvd,default-logins,misconfigurations,vulnerabilities,exposure,takeover,exposed-panels,secret" \
+    -severity low,medium,high,critical \
+    -c 25 -rl 150 -timeout 5 \
+    -json -o "$OUTPUT_DIR/vulns/nuclei.json" 2>/dev/null || true
 echo -e "${GREEN}[✔] Nuclei scan concluído!${RESET}"
 
+# 8️⃣ Nikto (primeiros N hosts vivos, timeout por host)
+print_banner "ETAPA 8: Nikto - Verificação de servidor web"
+NIKTO_COUNT=0
+while IFS= read -r url && [ "$NIKTO_COUNT" -lt "$NIKTO_MAX_HOSTS" ]; do
+    [ -z "$url" ] && continue
+    NIKTO_COUNT=$((NIKTO_COUNT + 1))
+    SAFE=$(echo "$url" | sed 's|https\?://||;s|[^a-zA-Z0-9.-]|_|g')
+    OUT_FILE="$OUTPUT_DIR/vulns/nikto_${SAFE}.json"
+    if [[ "$url" == https* ]]; then
+        timeout 120 nikto -h "$url" -ssl -Format json -o "$OUT_FILE" 2>/dev/null || true
+    else
+        timeout 120 nikto -h "$url" -Format json -o "$OUT_FILE" 2>/dev/null || true
+    fi
+    echo -e "${GREEN}[✔] Nikto ($NIKTO_COUNT/$NIKTO_MAX_HOSTS): $url${RESET}"
+done < "$OUTPUT_DIR/hosts/alive.txt"
+
+# 9️⃣ ZAP baseline (opcional, env-gated; primeiros M hosts)
+if [ "$ZAP_BASELINE_ENABLED" = "true" ] && command -v zap-baseline.py &>/dev/null; then
+    print_banner "ETAPA 9: ZAP Baseline (crawl + passive)"
+    ZAP_COUNT=0
+    while IFS= read -r url && [ "$ZAP_COUNT" -lt "$ZAP_MAX_HOSTS" ]; do
+        [ -z "$url" ] && continue
+        ZAP_COUNT=$((ZAP_COUNT + 1))
+        SAFE=$(echo "$url" | sed 's|https\?://||;s|[^a-zA-Z0-9.-]|_|g')
+        OUT_FILE="$OUTPUT_DIR/vulns/zap_${SAFE}.json"
+        timeout 300 zap-baseline.py -t "$url" -m 1 -T 3 -J "$OUT_FILE" 2>/dev/null || true
+        echo -e "${GREEN}[✔] ZAP baseline ($ZAP_COUNT/$ZAP_MAX_HOSTS): $url${RESET}"
+    done < "$OUTPUT_DIR/hosts/alive.txt"
+else
+    echo -e "${YELLOW}[!] ZAP baseline omitido (ZAP_BASELINE_ENABLED=false ou zap-baseline.py não encontrado).${RESET}"
+fi
+
 # === FIM ===
+FINISHED_AT=$(date -Iseconds)
+echo "{\"started_at\": \"$STARTED_AT\", \"finished_at\": \"$FINISHED_AT\", \"status\": \"completed\"}" > "$OUTPUT_DIR/status.json"
 print_banner "Recon FINALIZADO para: $DOMAIN"
 echo -e "Resultados completos salvos no diretório: ${BOLD}$OUTPUT_DIR${RESET}"
 echo -e "Log de execução: ${BOLD}${LOG_FILE}${RESET}"

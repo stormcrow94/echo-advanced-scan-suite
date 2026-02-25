@@ -16,7 +16,9 @@ An automated reconnaissance scanner built with Docker for comprehensive security
 - **Active Host Detection**: Identifies live web servers with httpx
 - **URL Collection**: Gathers historical URLs from Wayback Machine and other sources
 - **JavaScript Analysis**: Extracts endpoints from JavaScript files using getJS
-- **Vulnerability Scanning**: Comprehensive vulnerability detection with Nuclei
+- **Vulnerability Scanning**: Comprehensive vulnerability detection with Nuclei (CVEs, misconfigurations, exposure, takeovers, secrets)
+- **Nikto**: Web server misconfigurations, dangerous files, and security headers (first N hosts, time-bounded)
+- **Optional ZAP baseline**: Light crawl and passive scan when enabled via env (time-boxed per host)
 
 ## Prerequisites
 
@@ -39,15 +41,47 @@ docker build -t echo-scanner .
 
 ## Usage
 
+### CLI scan (default)
+
 Run a scan against a target domain:
 
 ```bash
 docker run --rm -v $(pwd)/output:/app/output echo-scanner -d example.com
 ```
 
+### REST API mode
+
+Run the container in API mode so external services can trigger scans and consume JSON reports:
+
+```bash
+docker run --rm -p 8080:8080 -v $(pwd)/output:/app/output echo-scanner serve
+```
+
+The API listens on port 8080. Configure with env: `PORT` (default 8080), `OUTPUT_DIR` (default `/app/output`).
+
+**Endpoints:**
+
+- **POST /api/scans** — Start a new scan. Body: `{"domain": "example.com"}`. Returns `202 Accepted` with `{"id": "recon-example.com-YYYY-MM-DD", "status": "running"}`.
+- **GET /api/scans** — List scan IDs: `{"scans": ["recon-example.com-2025-02-25", ...]}`.
+- **GET /api/scans/:id** — Get scan status or full report. While running: `{"id": "...", "status": "running", "started_at": "..."}`. When completed: full JSON report (subdomains, hosts, urls, js, vulns, nikto, zap).
+
+**Example (start scan, then poll for report):**
+
+```bash
+# Start scan
+curl -s -X POST http://localhost:8080/api/scans -H "Content-Type: application/json" -d '{"domain":"example.com"}'
+# → {"id":"recon-example.com-2025-02-25","status":"running"}
+
+# Poll until completed, then response is the report
+curl -s http://localhost:8080/api/scans/recon-example.com-2025-02-25
+```
+
+Reports are a single JSON object with `id`, `domain`, `status`, `started_at`, `finished_at`, `subdomains`, `hosts`, `urls`, `js`, `vulns` (Nuclei), and optionally `nikto` and `zap` when those tools ran.
+
 ### Command Options
 
-- `-d, --domain`: Target domain for reconnaissance (required)
+- `-d, --domain`: Target domain for reconnaissance (required for CLI scan)
+- `serve` or `--serve`: Run the REST API server instead of a one-off scan
 - `--install`: Install all tools and dependencies (for local installation)
 - `-h, --help`: Show help message
 
@@ -64,17 +98,22 @@ Results will be saved in `./output/recon-example.com-YYYY-MM-DD/`
 ```
 output/
 └── recon-example.com-YYYY-MM-DD/
-    ├── recon.log              # Full execution log
-    ├── subdomains.txt         # All discovered subdomains
-    ├── urls.txt               # Historical URLs collected
+    ├── status.json            # Scan status (started_at, finished_at, status)
+    ├── recon.log               # Full execution log
+    ├── subdomains.txt          # All discovered subdomains
+    ├── urls.txt                # Historical URLs collected
     ├── hosts/
-    │   ├── resolved.txt       # DNS-resolved subdomains
-    │   ├── ports.txt          # Open ports discovered
-    │   └── alive.txt          # Active web servers
+    │   ├── resolved.txt        # DNS-resolved subdomains
+    │   ├── ports.txt            # Open ports discovered
+    │   └── alive.txt            # Active web servers
     ├── js/
-    │   └── endpoints.txt      # Endpoints extracted from JavaScript
+    │   ├── js_urls.txt          # JavaScript URLs
+    │   └── endpoints.txt       # Endpoints extracted from JavaScript
     └── vulns/
-        └── nuclei.txt         # Nuclei vulnerability scan results
+        ├── nuclei.txt          # Nuclei scan (text)
+        ├── nuclei.json         # Nuclei findings (JSONL, for API report)
+        ├── nikto_*.json        # Nikto results per host (when run)
+        └── zap_*.json          # ZAP baseline results per host (optional)
 ```
 
 ## Tools Included
@@ -89,7 +128,9 @@ output/
 - **waybackurls** - Fetch URLs from Wayback Machine
 - **gau** - Get All URLs from multiple sources
 - **getJS** - JavaScript file analysis
-- **nuclei** - Vulnerability scanner with templates
+- **nuclei** - Vulnerability scanner (CVEs, misconfigurations, exposure, takeovers, secrets)
+- **nikto** - Web server scanner (misconfigs, dangerous files, headers)
+- **ZAP baseline** (optional) - Light crawl + passive scan when `ZAP_BASELINE_ENABLED=true` and ZAP is installed
 
 ## Scan Stages
 
@@ -101,7 +142,9 @@ The scanner performs the following stages automatically:
 4. **Web Server Detection** - Identifies active HTTP/HTTPS services
 5. **URL Collection** - Gathers historical URLs from Wayback Machine and other sources
 6. **JavaScript Analysis** - Extracts endpoints from JavaScript files
-7. **Vulnerability Scanning** - Runs Nuclei to detect security issues
+7. **Vulnerability Scanning** - Runs Nuclei (with exposure, takeover, secret templates; rate-limited)
+8. **Nikto** - Web server checks on first N alive hosts (timeout per host)
+9. **ZAP baseline** (optional) - Light crawl + passive scan on first M hosts when enabled
 
 ## Local Installation (Without Docker)
 
@@ -124,12 +167,16 @@ Then run scans directly:
 - Respect rate limits and terms of service of external APIs
 - Some tools may trigger IDS/IPS systems
 
-## Performance Tips
+## Performance Tips & Time Budget
 
-- Scans can take 10-30 minutes depending on target size
-- Port scanning and Nuclei vulnerability scanning are the most time-intensive phases
-- Use the Docker volume mount to preserve results between runs
-- Adjust timeout values in the script for faster scans if needed
+- **Target scan time**: About 20–30 minutes per run (configurable). Scans use per-stage timeouts to stay within this range.
+- **Env vars** (optional):
+  - `MAX_SCAN_MINUTES` - Soft cap for total scan time (default: 30).
+  - `NIKTO_MAX_HOSTS` - Number of alive hosts to run Nikto on (default: 10).
+  - `ZAP_BASELINE_ENABLED` - Set to `true` to run ZAP baseline on first M hosts (default: false; requires ZAP in the image or sidecar).
+  - `ZAP_MAX_HOSTS` - Number of hosts for ZAP baseline when enabled (default: 5).
+- Port scanning and Nuclei are the most time-intensive phases; Nuclei is run with concurrency and rate limits.
+- Use the Docker volume mount to preserve results between runs.
 
 ## Troubleshooting
 
@@ -172,7 +219,9 @@ Um scanner de reconhecimento automatizado construído com Docker para avaliaçã
 - **Detecção de Hosts Ativos**: Identifica servidores web ativos com httpx
 - **Coleta de URLs**: Reúne URLs históricas do Wayback Machine e outras fontes
 - **Análise de JavaScript**: Extrai endpoints de arquivos JavaScript usando getJS
-- **Varredura de Vulnerabilidades**: Detecção abrangente de vulnerabilidades com Nuclei
+- **Varredura de Vulnerabilidades**: Detecção com Nuclei (CVEs, misconfigurações, exposição, takeovers, secrets)
+- **Nikto**: Misconfigurações de servidor web, arquivos perigosos e headers de segurança (primeiros N hosts, com timeout)
+- **ZAP baseline (opcional)**: Crawl leve e varredura passiva quando ativado via env (limitado por tempo por host)
 
 ## Pré-requisitos
 
@@ -195,15 +244,30 @@ docker build -t echo-scanner .
 
 ## Uso
 
+### Varredura via CLI (padrão)
+
 Execute uma varredura contra um domínio alvo:
 
 ```bash
 docker run --rm -v $(pwd)/output:/app/output echo-scanner -d exemplo.com
 ```
 
+### Modo API REST
+
+Execute o container no modo API para que outros serviços possam disparar varreduras e consumir relatórios em JSON:
+
+```bash
+docker run --rm -p 8080:8080 -v $(pwd)/output:/app/output echo-scanner serve
+```
+
+A API escuta na porta 8080. Configure com env: `PORT` (padrão 8080), `OUTPUT_DIR` (padrão `/app/output`).
+
+**Endpoints:** POST /api/scans (iniciar scan), GET /api/scans (listar), GET /api/scans/:id (status ou relatório JSON completo). Relatórios incluem subdomains, hosts, urls, js, vulns (Nuclei), nikto e zap quando aplicável.
+
 ### Opções de Comando
 
-- `-d, --domain`: Domínio alvo para reconhecimento (obrigatório)
+- `-d, --domain`: Domínio alvo para reconhecimento (obrigatório no modo CLI)
+- `serve` ou `--serve`: Executar o servidor da API REST em vez de uma varredura única
 - `--install`: Instala todas as ferramentas e dependências (para instalação local)
 - `-h, --help`: Mostra mensagem de ajuda
 
@@ -220,17 +284,22 @@ Os resultados serão salvos em `./output/recon-exemplo.com-YYYY-MM-DD/`
 ```
 output/
 └── recon-exemplo.com-YYYY-MM-DD/
-    ├── recon.log              # Log completo de execução
-    ├── subdomains.txt         # Todos os subdomínios descobertos
-    ├── urls.txt               # URLs históricas coletadas
+    ├── status.json            # Status do scan (started_at, finished_at, status)
+    ├── recon.log               # Log completo de execução
+    ├── subdomains.txt          # Todos os subdomínios descobertos
+    ├── urls.txt                # URLs históricas coletadas
     ├── hosts/
-    │   ├── resolved.txt       # Subdomínios resolvidos via DNS
-    │   ├── ports.txt          # Portas abertas descobertas
-    │   └── alive.txt          # Servidores web ativos
+    │   ├── resolved.txt        # Subdomínios resolvidos via DNS
+    │   ├── ports.txt           # Portas abertas descobertas
+    │   └── alive.txt           # Servidores web ativos
     ├── js/
-    │   └── endpoints.txt      # Endpoints extraídos do JavaScript
+    │   ├── js_urls.txt         # URLs de JavaScript
+    │   └── endpoints.txt       # Endpoints extraídos do JavaScript
     └── vulns/
-        └── nuclei.txt         # Resultados da varredura Nuclei
+        ├── nuclei.txt         # Nuclei (texto)
+        ├── nuclei.json        # Nuclei (JSONL, para relatório da API)
+        ├── nikto_*.json       # Resultados Nikto por host
+        └── zap_*.json         # Resultados ZAP baseline por host (opcional)
 ```
 
 ## Ferramentas Incluídas
@@ -245,7 +314,9 @@ output/
 - **waybackurls** - Busca URLs do Wayback Machine
 - **gau** - Obtém todas as URLs de múltiplas fontes
 - **getJS** - Análise de arquivos JavaScript
-- **nuclei** - Scanner de vulnerabilidades com templates
+- **nuclei** - Scanner de vulnerabilidades (CVEs, misconfigs, exposure, takeovers, secrets)
+- **nikto** - Scanner de servidor web (misconfigs, arquivos perigosos, headers)
+- **ZAP baseline** (opcional) - Crawl leve + varredura passiva quando `ZAP_BASELINE_ENABLED=true` e ZAP instalado
 
 ## Etapas da Varredura
 
@@ -257,7 +328,9 @@ O scanner executa as seguintes etapas automaticamente:
 4. **Detecção de Servidores Web** - Identifica serviços HTTP/HTTPS ativos
 5. **Coleta de URLs** - Reúne URLs históricas do Wayback Machine e outras fontes
 6. **Análise de JavaScript** - Extrai endpoints de arquivos JavaScript
-7. **Varredura de Vulnerabilidades** - Executa Nuclei para detectar problemas de segurança
+7. **Varredura de Vulnerabilidades** - Executa Nuclei (exposure, takeover, secret; com rate limit)
+8. **Nikto** - Verificações de servidor web nos primeiros N hosts (timeout por host)
+9. **ZAP baseline** (opcional) - Crawl leve + varredura passiva nos primeiros M hosts quando ativado
 
 ## Instalação Local (Sem Docker)
 
@@ -280,12 +353,12 @@ Depois execute as varreduras diretamente:
 - Respeite limites de taxa e termos de serviço de APIs externas
 - Algumas ferramentas podem acionar sistemas IDS/IPS
 
-## Dicas de Performance
+## Dicas de Performance e Tempo de Varredura
 
-- As varreduras podem levar de 10 a 30 minutos dependendo do tamanho do alvo
-- Varredura de portas e varredura de vulnerabilidades com Nuclei são as fases mais demoradas
-- Use o volume mount do Docker para preservar resultados entre execuções
-- Ajuste valores de timeout no script para varreduras mais rápidas se necessário
+- **Tempo alvo**: Cerca de 20–30 minutos por execução (configurável). As varreduras usam timeouts por etapa para respeitar esse intervalo.
+- **Variáveis de ambiente** (opcionais): `MAX_SCAN_MINUTES`, `NIKTO_MAX_HOSTS`, `ZAP_BASELINE_ENABLED`, `ZAP_MAX_HOSTS` (veja a seção em inglês para detalhes).
+- Varredura de portas e Nuclei são as fases mais demoradas; Nuclei é executado com concorrência e rate limits.
+- Use o volume do Docker para preservar resultados entre execuções.
 
 ## Solução de Problemas
 
