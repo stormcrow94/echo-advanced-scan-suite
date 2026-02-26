@@ -144,7 +144,7 @@ fi
 print_banner "ETAPA 5: Coletando URLs de Fontes Históricas"
 (
     cat "$OUTPUT_DIR/hosts/alive.txt" | waybackurls || true
-    cat "$OUTPUT_DIR/hosts/alive.txt" | gau -b png,jpg,gif,svg,css,js,woff,woff2 -t 20 || true
+    cat "$OUTPUT_DIR/hosts/alive.txt" | gau --blacklist png,jpg,gif,svg,css,js,woff,woff2 --threads 20 || true
 ) | sort -u | anew "$OUTPUT_DIR/urls.txt"
 echo -e "${GREEN}[✔] URLs coletadas: $(wc -l < "$OUTPUT_DIR/urls.txt")${RESET}"
 
@@ -173,7 +173,7 @@ timeout 10m nuclei -l "$OUTPUT_DIR/hosts/alive.txt" \
     -t "technologies,cves,cnvd,default-logins,misconfigurations,vulnerabilities,exposure,takeover,exposed-panels,secret" \
     -severity low,medium,high,critical \
     -c 25 -rl 150 -timeout 5 \
-    -json -o "$OUTPUT_DIR/vulns/nuclei.json" 2>/dev/null || true
+    -jsonl -o "$OUTPUT_DIR/vulns/nuclei.json" 2>/dev/null || true
 echo -e "${GREEN}[✔] Nuclei scan concluído!${RESET}"
 
 # 8️⃣ Nikto (primeiros N hosts vivos, timeout por host)

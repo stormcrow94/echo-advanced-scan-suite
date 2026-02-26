@@ -31,7 +31,12 @@ Docker requires special setup in the Cursor Cloud VM (nested container environme
 
 ### Gotchas
 
-- The Dockerfile installs `getJS@latest` which now requires Go >= 1.24. The Go version in the Dockerfile was bumped to 1.25.7 to accommodate this.
-- Scans take 20–30 minutes. For quick API verification, just confirm `GET /api/scans` returns JSON after starting the container in `serve` mode.
+- **Go version**: `getJS@latest` requires Go >= 1.24. The Dockerfile uses Go 1.25.7.
+- **getJS flag change**: The `--list` flag was renamed to `--input` in newer versions of getJS.
+- **Nuclei v3 flag change**: `-json` was replaced by `-jsonl` for JSONL output.
+- **gau flag change**: `-b` was replaced by `--blacklist`, `-t` by `--threads`.
+- **Nikto**: Installed from GitHub (sullo/nikto) instead of the Ubuntu repo, because the repo version (2.1.5) has broken SSL and no JSON output support.
+- **pipefail**: The script uses `set -eo pipefail`. All tool invocations in pipelines must be guarded with `|| true` to prevent non-zero exits (e.g. `amass` timeout, `grep` no-match, `gau` errors) from killing the entire script.
+- Scans take 15–30 minutes depending on the domain. For quick API verification, just confirm `GET /api/scans` returns JSON after starting the container in `serve` mode.
 - The `recon.sh` script hardcodes output to `/app/output`. When running outside Docker, ensure that directory exists or adjust paths.
 - Environment variables `MAX_SCAN_MINUTES`, `NIKTO_MAX_HOSTS`, `ZAP_BASELINE_ENABLED` can tune scan behavior (see README).
