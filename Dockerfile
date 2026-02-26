@@ -4,7 +4,7 @@ FROM ubuntu:22.04
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies (add universe for Nikto)
+# Install system dependencies
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
     software-properties-common \
     && add-apt-repository -y universe \
@@ -17,13 +17,22 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
     libpcap-dev \
     build-essential \
     unzip \
-    nikto \
+    perl \
+    libnet-ssleay-perl \
+    libio-socket-ssl-perl \
+    libjson-perl \
+    libxml-writer-perl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Nikto from GitHub (latest, with SSL + JSON support)
+RUN git clone https://github.com/sullo/nikto.git /opt/nikto && \
+    ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto && \
+    chmod +x /opt/nikto/program/nikto.pl
+
 # Install Go
-RUN wget -q https://go.dev/dl/go1.23.4.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.23.4.linux-amd64.tar.gz && \
-    rm go1.23.4.linux-amd64.tar.gz
+RUN wget -q https://go.dev/dl/go1.25.7.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.25.7.linux-amd64.tar.gz && \
+    rm go1.25.7.linux-amd64.tar.gz
 
 # Set up the PATH for Go
 ENV PATH="/usr/local/go/bin:/usr/local/bin:${PATH}"
