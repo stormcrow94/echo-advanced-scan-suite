@@ -36,23 +36,29 @@ install_system_packages() {
         log "Instalando pacotes (apt)"
         $SUDO env DEBIAN_FRONTEND=noninteractive apt-get update -qq
         $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-            ca-certificates tzdata curl unzip git jq libpcap0.8 python3 python3-pip python3-reportlab fonts-dejavu-core \
+            ca-certificates tzdata curl unzip git jq libpcap0.8 python3 python3-pip python3-venv python3-reportlab fonts-dejavu-core \
             perl libnet-ssleay-perl libio-socket-ssl-perl libjson-perl libxml-writer-perl
     elif command -v dnf >/dev/null 2>&1; then
         log "Instalando pacotes (dnf)"
         $SUDO dnf install -y -q epel-release >/dev/null 2>&1 || true
-        $SUDO dnf install -y -q ca-certificates tzdata curl unzip git jq libpcap python3 python3-pip python3-reportlab \
+        $SUDO dnf install -y -q ca-certificates tzdata curl unzip git jq libpcap python3 python3-pip python3-venv python3-reportlab \
             dejavu-sans-fonts dejavu-sans-mono-fonts perl perl-Net-SSLeay perl-IO-Socket-SSL perl-JSON perl-XML-Writer \
             || log "Alguns pacotes opcionais não estão disponíveis; verifique com ./recon.sh --check-deps"
     else
-        log "Gerenciador de pacotes não suportado: instale manualmente curl, unzip, git, jq, libpcap, python3-pip, python3-reportlab"
+        log "Gerenciador de pacotes não suportado: instale manualmente curl, unzip, git, jq, libpcap, python3-pip, python3-venv, python3-reportlab"
     fi
-    # Fallback do reportlab (PEP 668: nunca usar pip no Python do sistema sem --user/venv)
+    # Fallback do reportlab. Como root (Docker) nunca usar `pip --user`: o site do root
+    # não é visível para o usuário `recon`. Instala no Python do sistema. Sem root: --user.
     if ! python3 -c 'import reportlab' >/dev/null 2>&1; then
-        log "python3-reportlab indisponível no gerenciador; tentando pip --user"
-        python3 -m pip install --user --quiet reportlab 2>/dev/null \
-            || python3 -m pip install --user --quiet --break-system-packages reportlab \
-            || log "Não foi possível instalar reportlab: relatórios PDF ficarão desativados (JSON continua)"
+        log "python3-reportlab indisponível no gerenciador; instalando via pip"
+        if [[ $EUID -eq 0 ]]; then
+            python3 -m pip install --quiet --break-system-packages reportlab \
+                || log "Não foi possível instalar reportlab: relatórios PDF ficarão desativados (JSON continua)"
+        else
+            python3 -m pip install --user --quiet reportlab 2>/dev/null \
+                || python3 -m pip install --user --quiet --break-system-packages reportlab \
+                || log "Não foi possível instalar reportlab: relatórios PDF ficarão desativados (JSON continua)"
+        fi
     fi
 }
 
@@ -68,38 +74,38 @@ gh_zip() {  # owner/repo tag asset binary
 }
 
 
-# waymore é um pacote PyPI (não há binário oficial tipo os do ProjectDiscovery).
-# Ordem: pipx (isolado, BIN via PIPX_BIN_DIR) -> pip --user -> pip --break-system-packages (PEP 668).
+# waymore é um pacote PyPI. Sempre instala num venv compartilhado (${OPT}/venv) e
+# cria um symlink em ${BIN}/waymore. Assim o usuário `recon` do container (e qualquer
+# outro) consegue importar as dependências. Nunca usamos `pip --user` como root:
+# isso deixaria o launcher em /usr/local/bin apontando para o site-packages do root.
+# Se pipx estiver presente, também usa caminhos compartilhados (PIPX_HOME=${OPT}/pipx,
+# PIPX_BIN_DIR=${BIN}) com permissão a+rX. Instalação local sem root (PREFIX=$HOME/.local)
+# usa o mesmo venv sob ${OPT}, de posse do próprio usuário.
 install_waymore() {
     local pkg="waymore==${WAYMORE_VERSION}"
-    log "  waymore ${WAYMORE_VERSION}"
-    local installed=0
+    local venv="${OPT}/venv"
+    log "  waymore ${WAYMORE_VERSION} -> ${venv}"
+    $SUDO mkdir -p "$BIN" "$OPT"
+
     if command -v pipx >/dev/null 2>&1; then
         if $SUDO env PIPX_BIN_DIR="${BIN}" PIPX_HOME="${OPT}/pipx" pipx install --force "$pkg" >/dev/null; then
-            installed=1
+            $SUDO chmod -R a+rX "${OPT}/pipx" "${BIN}/waymore" 2>/dev/null || true
+            if [[ -e "${BIN}/waymore" ]]; then
+                return
+            fi
         fi
     fi
-    if [[ "$installed" -eq 0 ]]; then
-        python3 -m pip --version >/dev/null 2>&1 || fail "python3-pip (ou pipx) é necessário para instalar o waymore"
-        if python3 -m pip install --user --quiet "$pkg" 2>/dev/null; then
-            installed=1
-        elif python3 -m pip install --user --quiet --break-system-packages "$pkg"; then
-            installed=1
-        elif $SUDO python3 -m pip install --quiet --break-system-packages "$pkg"; then
-            installed=1
-        else
-            fail "Não foi possível instalar ${pkg}"
-        fi
+
+    python3 -c "import venv" >/dev/null 2>&1 || fail "python3-venv é necessário para instalar o waymore"
+    if [[ ! -x "${venv}/bin/pip" ]]; then
+        $SUDO python3 -m venv "$venv" || fail "Não foi possível criar o venv em ${venv}"
     fi
-    if [[ ! -x "${BIN}/waymore" ]]; then
-        local src=""
-        if command -v waymore >/dev/null 2>&1; then
-            src="$(command -v waymore)"
-        elif [[ -x "${HOME}/.local/bin/waymore" ]]; then
-            src="${HOME}/.local/bin/waymore"
-        fi
-        [[ -n "$src" ]] || fail "waymore instalado, mas o executável não foi encontrado no PATH"
-        $SUDO install -m 0755 "$src" "${BIN}/waymore"
+    $SUDO "${venv}/bin/pip" install --quiet "$pkg" || fail "Não foi possível instalar ${pkg} no venv ${venv}"
+    $SUDO chmod -R a+rX "$venv"
+    $SUDO ln -sfn "${venv}/bin/waymore" "${BIN}/waymore"
+    # Confirma que um usuário sem o site-packages do instalador consegue executar.
+    if [[ ! -e "${BIN}/waymore" ]]; then
+        fail "symlink de waymore não criado em ${BIN}/waymore"
     fi
 }
 

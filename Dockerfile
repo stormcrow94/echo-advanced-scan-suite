@@ -19,9 +19,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /app
 
-# Ferramentas (versões fixadas em scripts/versions.env)
+# Ferramentas (versões fixadas em scripts/versions.env).
+# waymore fica no venv compartilhado /opt/echo/venv (o container roda como `recon`).
 COPY scripts/ /app/scripts/
 RUN SKIP_TEMPLATES=1 OPT_DIR=/opt/echo /app/scripts/install.sh \
+    && chmod -R a+rX /opt/echo \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /root/.cache
 
 # Usuário sem privilégios (a imagem ubuntu:24.04 já traz o usuário "ubuntu" com UID 1000)

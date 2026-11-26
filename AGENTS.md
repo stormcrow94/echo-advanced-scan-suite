@@ -23,4 +23,4 @@ ECHO Advanced Scan Suite: `recon.sh` (bash pipeline) + `report/echo_report.py` (
 - Nuclei templates moved under `http/`, `dns/`, `ssl/`...; validate `-t` paths after a template bump.
 - katana `-kf` accepts a single value (`all`, `robotstxt` or `sitemapxml`); tlsx forbids `-san/-cn` together with other probes.
 - The container runs as UID 1000 (`recon`); mounted `output/` must be writable by it.
-- waymore is a pinned PyPI package (`WAYMORE_VERSION` in `scripts/versions.env`); the `urls` module runs `-mode U` (URLs only, no archived-response download).
+- waymore is a pinned PyPI package (`WAYMORE_VERSION`) installed into a **shared venv** at `$OPT_DIR/venv` (Docker: `/opt/echo/venv`) and symlinked into `$PREFIX/bin`. Never `pip install --user` as root: the `recon` user cannot import root's user-site, and the `urls` module would produce no results. The `urls` module runs `-mode U` (URLs only, no archived-response download).

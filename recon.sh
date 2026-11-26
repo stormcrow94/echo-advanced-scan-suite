@@ -11,7 +11,7 @@
 # #############################################################################
 set -uo pipefail
 
-ECHO_VERSION="2026.11.1"
+ECHO_VERSION="2026.11.2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Garante que os diretórios usuais de binários Go estejam no PATH
@@ -239,7 +239,7 @@ if [[ -z "$TOP_PORTS" ]]; then [[ "$PROFILE" == "deep" ]] && TOP_PORTS=1000 || T
 case "$TOP_PORTS" in 100|1000) ;; *) die "--top-ports deve ser 100 ou 1000";; esac
 [[ -z "$REPORT_LOGO" || -f "$REPORT_LOGO" ]] || die "Logo não encontrado: $REPORT_LOGO"
 if [[ -n "$SCAN_ID" ]]; then
-    [[ "$SCAN_ID" =~ ^recon-[a-z0-9.-]+-[0-9]{4}-[0-9]{2}-[0-9]{2}(-[0-9]{6})?$ ]] || die "--scan-id inválido"
+    [[ "$SCAN_ID" =~ ^recon-[a-z0-9.-]+-[0-9]{4}-[0-9]{2}-[0-9]{2}(-[0-9]{6})?(-n[0-9]+)?$ ]] || die "--scan-id inválido"
 fi
 
 # Resolve a lista de módulos

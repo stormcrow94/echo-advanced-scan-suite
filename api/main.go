@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	scanIDRe = regexp.MustCompile(`^recon-[a-z0-9][a-z0-9.-]*-[0-9]{4}-[0-9]{2}-[0-9]{2}(-[0-9]{6})?$`)
+	scanIDRe = regexp.MustCompile(`^recon-[a-z0-9][a-z0-9.-]*-[0-9]{4}-[0-9]{2}-[0-9]{2}(-[0-9]{6})?(-n[0-9]+)?$`)
 	domainRe = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 	nameRe   = regexp.MustCompile(`^[\p{L}\p{N} .,&()_'/-]{0,80}$`)
 )
@@ -46,6 +46,38 @@ type server struct {
 	cfg     config
 	mu      sync.Mutex
 	running map[string]*exec.Cmd
+	now     func() time.Time
+}
+
+func (s *server) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
+}
+
+// uniqueScanID returns recon-<domain>-<YYYY-MM-DD-HHMMSS>, or the same with a
+// -nN suffix if that id is already running or its output directory exists.
+func (s *server) uniqueScanID(domain, outDir string) (string, error) {
+	base := fmt.Sprintf("recon-%s-%s", domain, s.clock().Format("2006-01-02-150405"))
+	for i := 0; i < 100; i++ {
+		id := base
+		if i > 0 {
+			id = fmt.Sprintf("%s-n%d", base, i)
+		}
+		if _, ok := s.running[id]; ok {
+			continue
+		}
+		_, err := os.Stat(filepath.Join(outDir, id))
+		if err == nil {
+			continue
+		}
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+		return id, nil
+	}
+	return "", fmt.Errorf("could not allocate a unique scan id")
 }
 
 type scanRequest struct {
@@ -119,6 +151,11 @@ func main() {
 		MaxConcurrent: maxc,
 		ReconScript:   getEnv("ECHO_RECON_SCRIPT", "/app/recon.sh"),
 	}
+	absOut, absErr := filepath.Abs(cfg.OutputDir)
+	if absErr != nil {
+		log.Fatalf("output dir: %v", absErr)
+	}
+	cfg.OutputDir = absOut
 	if err := os.MkdirAll(cfg.OutputDir, 0o755); err != nil {
 		log.Fatalf("output dir: %v", err)
 	}
@@ -243,10 +280,19 @@ func (s *server) startScan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	scanID := fmt.Sprintf("recon-%s-%s", domain, time.Now().Format("2006-01-02-150405"))
-	args = append(args, "--scan-id", scanID, "--output", s.cfg.OutputDir)
+	outDir, err := filepath.Abs(s.cfg.OutputDir)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "output dir: "+err.Error())
+		return
+	}
+	scanID, err := s.uniqueScanID(domain, outDir)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	args = append(args, "--scan-id", scanID, "--output", outDir)
 	cmd := exec.Command(s.cfg.ReconScript, args...)
-	cmd.Dir = s.cfg.OutputDir
+	cmd.Dir = outDir
 	cmd.Env = append(os.Environ(), "NO_COLOR=1")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -362,7 +408,7 @@ func buildReport(id, dir string, sf statusFile) *report {
 // recon-example.com-2026-01-31[-150405] -> example.com
 func extractDomainFromID(id string) string {
 	s := strings.TrimPrefix(id, "recon-")
-	re := regexp.MustCompile(`-[0-9]{4}-[0-9]{2}-[0-9]{2}(-[0-9]{6})?$`)
+	re := regexp.MustCompile(`-[0-9]{4}-[0-9]{2}-[0-9]{2}(-[0-9]{6})?(-n[0-9]+)?$`)
 	return re.ReplaceAllString(s, "")
 }
 
