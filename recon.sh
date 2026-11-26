@@ -11,7 +11,7 @@
 # #############################################################################
 set -uo pipefail
 
-ECHO_VERSION="2026.11"
+ECHO_VERSION="2026.11.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Garante que os diretórios usuais de binários Go estejam no PATH
@@ -178,7 +178,7 @@ fi
 # ferramenta -> módulos que dependem dela
 declare -A TOOL_FOR=(
     [subfinder]="subdomains" [findomain]="subdomains" [dnsx]="dns" [naabu]="ports"
-    [httpx]="web js" [tlsx]="tls" [gau]="urls" [katana]="crawl js" [nuclei]="nuclei"
+    [httpx]="web js" [tlsx]="tls" [waymore]="urls" [katana]="crawl js" [nuclei]="nuclei"
     [nikto]="nikto" [jq]="core" [curl]="core" [python3]="report"
 )
 
@@ -197,7 +197,7 @@ tool_ok() {
 check_deps() {
     local missing=0 t
     section "Verificação de dependências"
-    for t in jq curl python3 subfinder findomain dnsx naabu httpx tlsx gau katana nuclei nikto; do
+    for t in jq curl python3 subfinder findomain dnsx naabu httpx tlsx waymore katana nuclei nikto; do
         if tool_ok "$t"; then
             ok "$(printf '%-10s' "$t") -> $(command -v "$t")"
         else
@@ -473,18 +473,44 @@ if should_run tls tlsx; then
     fi
 fi
 
-# 6) URLs históricas (gau: Wayback, CommonCrawl, OTX, URLScan)
-if should_run urls gau; then
-    mod_begin "URLs históricas (gau)"
-    echo "$DOMAIN" | timeout 10m gau --subs --threads 5 --timeout 30 \
-        --blacklist png,jpg,jpeg,gif,svg,ico,css,woff,woff2,ttf,eot,mp4,webp 2>>"$OUT/urls/errors.log" \
-        | head -n "$URLS_MAX" | sort -u > "$URLS"
-    if [[ ! -s "$URLS" ]]; then  # arquivos públicos (Wayback/OTX) oscilam bastante: uma nova tentativa
-        warn "gau não retornou URLs; tentando novamente em 20 s"
+# 6) URLs históricas (waymore: Wayback, Common Crawl, OTX, URLScan, GhostArchive)
+# -mode U: só URLs (não baixa respostas arquivadas). Subdomínios vêm no padrão.
+# Nenhuma chave de API é exigida. A saída continua em urls.txt para o relatório e o módulo js.
+run_waymore() {
+    local budget="$1"
+    # -ow sobrescreve; -lcc 1 usa só a coleção mais recente do Common Crawl.
+    # -wrlr/-urlr limitam a espera em caso de 429 para não consumir todo o timeout.
+    timeout "$budget" waymore -i "$DOMAIN" -mode U -oU "$OUT/urls/waymore.txt" -ow \
+        -lcc 1 -p 2 -r 1 -wrlr 1 -urlr 1 \
+        >/dev/null 2>>"$OUT/urls/errors.log" || true
+}
+
+normalize_waymore_urls() {
+    : > "$URLS"
+    if [[ -s "$OUT/urls/waymore.txt" ]]; then
+        local filtered="$OUT/urls/filtered.txt"
+        # Remove estáticos comuns (mantém .js — o módulo js lê urls.txt).
+        grep -aE '^https?://' "$OUT/urls/waymore.txt" 2>/dev/null \
+            | grep -aviE '\.(png|jpe?g|gif|svg|ico|css|woff2?|ttf|eot|mp4|webp)([?#]|$)' \
+            | sort -u > "$filtered" || true
+        # Ao aplicar o teto, prioriza arquivos .js para não perdê-los no corte alfabético.
+        {
+            grep -aiE '^https?://[^/]+/[^?#]*\.js([?#].*)?$' "$filtered" || true
+            grep -aviE '^https?://[^/]+/[^?#]*\.js([?#].*)?$' "$filtered" || true
+        } | awk 'NF && !seen[$0]++' | head -n "$URLS_MAX" > "$URLS" || true
+        rm -f "$filtered"
+    fi
+}
+
+if should_run urls waymore; then
+    mod_begin "URLs históricas (waymore)"
+    run_waymore 12m
+    normalize_waymore_urls
+    if [[ ! -s "$URLS" ]]; then  # fontes públicas (Wayback/OTX) oscilam bastante: uma nova tentativa
+        warn "waymore não retornou URLs; tentando novamente em 20 s"
         sleep 20
-        echo "$DOMAIN" | timeout 10m gau --subs --threads 3 --timeout 60 \
-            --blacklist png,jpg,jpeg,gif,svg,ico,css,woff,woff2,ttf,eot,mp4,webp 2>>"$OUT/urls/errors.log" \
-            | head -n "$URLS_MAX" | sort -u > "$URLS"
+        run_waymore 12m
+        normalize_waymore_urls
     fi
     n=$(count "$URLS")
     if [[ "$n" -gt 0 ]]; then mod_end urls ok "$n URLs (limite ${URLS_MAX})"; else mod_end urls empty "nenhuma URL histórica"; fi

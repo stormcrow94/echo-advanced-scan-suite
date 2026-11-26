@@ -2,6 +2,15 @@
 
 Todas as mudanças relevantes deste projeto. Formato inspirado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2026.11.1] - 2026-11-26
+
+### Alterado
+- O módulo `urls` passou a usar **[waymore](https://github.com/xnl-h4ck3r/waymore) 8.9** no lugar do **gau**.
+  O gau ainda recebe commits, mas não tinha release desde outubro de 2024. O waymore é chamado em `-mode U`
+  (só URLs, sem baixar respostas arquivadas), inclui subdomínios por padrão e não exige chaves de API.
+  A saída continua em `urls.txt` para o relatório e o módulo `js`. Instalação via `pip`/`pipx` (versão em
+  `scripts/versions.env`).
+
 ## [Revisão completa 2026.11] - 2026-11-25
 
 Revisão geral do projeto: ferramentas atualizadas ou substituídas, bugs corrigidos, sistema de relatórios novo e

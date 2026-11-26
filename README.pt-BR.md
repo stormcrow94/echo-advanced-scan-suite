@@ -58,7 +58,7 @@ profissional e um export JSON** em português ou inglês. Funciona como CLI, ima
 | `ports` | [naabu](https://github.com/projectdiscovery/naabu) | Top 100 (standard) / 1000 (deep) portas, connect scan sem root, ciente de CDN | Sim (com limite) |
 | `web` | [httpx](https://github.com/projectdiscovery/httpx) | Serviços web ativos, status, título, servidor, tecnologias, CDN | Sim |
 | `tls` | [tlsx](https://github.com/projectdiscovery/tlsx) | Certificados: expirado, autoassinado, nome divergente, não confiável, TLS legado | Sim |
-| `urls` | [gau](https://github.com/lc/gau) | URLs históricas (Wayback, Common Crawl, OTX, URLScan) | Não |
+| `urls` | [waymore](https://github.com/xnl-h4ck3r/waymore) | URLs históricas (Wayback, Common Crawl, OTX, URLScan, GhostArchive) | Não |
 | `crawl` | [katana](https://github.com/projectdiscovery/katana) | Crawling dos sites (profundidade 3, robots/sitemap, parsing de JS, tempo limitado) | Sim |
 | `js` | httpx + curl | Encontra arquivos JavaScript ativos e extrai endpoints/URLs | Sim |
 | `nuclei` | [nuclei](https://github.com/projectdiscovery/nuclei) | Templates de misconfiguration, exposições, painéis, takeover, SSL e DNS (low+); o deep adiciona o profile `recommended` e info | Sim |
@@ -211,7 +211,7 @@ output/recon-example.com-2026-11-25-120000/
 │   ├── httpx.json           # detalhes da sondagem web
 │   └── alive.txt            # URLs web ativas
 ├── tls/tlsx.json            # dados dos certificados
-├── urls.txt                 # URLs históricas (gau)
+├── urls.txt                 # URLs históricas (waymore)
 ├── urls/crawl.txt           # URLs rastreadas (katana)
 ├── js/js_urls.txt           # arquivos JavaScript ativos
 ├── js/endpoints.txt         # endpoints extraídos do JS

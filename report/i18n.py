@@ -60,7 +60,7 @@ STRINGS = {
         "truncated": "Showing {shown} of {total}. Full data is available in the JSON export and scan directory.",
         "none": "None",
         "methodology": ("ECHO combines passive sources (subfinder, findomain, Certificate Transparency via crt.sh, "
-                        "web archives via gau) with light active checks (dnsx, naabu connect scan, httpx, tlsx, katana, "
+                        "web archives via waymore) with light active checks (dnsx, naabu connect scan, httpx, tlsx, katana, "
                         "Nuclei non-intrusive templates and, on the deep profile, Nikto). Requests to the target are rate "
                         "limited. Denial-of-service, fuzzing, brute-force and default-credential templates are excluded."),
         "disclaimer": ("Automated results may contain false positives and do not replace a manual penetration test. "
@@ -140,7 +140,7 @@ STRINGS = {
         "truncated": "Exibindo {shown} de {total}. Os dados completos estão no export JSON e no diretório do scan.",
         "none": "Nenhum",
         "methodology": ("O ECHO combina fontes passivas (subfinder, findomain, Certificate Transparency via crt.sh, "
-                        "arquivos web via gau) com verificações ativas leves (dnsx, naabu em connect scan, httpx, tlsx, katana, "
+                        "arquivos web via waymore) com verificações ativas leves (dnsx, naabu em connect scan, httpx, tlsx, katana, "
                         "templates não intrusivos do Nuclei e, no perfil deep, Nikto). As requisições ao alvo têm limite de taxa. "
                         "Templates de negação de serviço, fuzzing, força bruta e credenciais padrão são excluídos."),
         "disclaimer": ("Resultados automatizados podem conter falsos positivos e não substituem um pentest manual. "
