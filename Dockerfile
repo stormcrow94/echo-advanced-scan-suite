@@ -1,95 +1,44 @@
-# Use a recent Ubuntu image as the base
-FROM ubuntu:22.04
+# syntax=docker/dockerfile:1
+# ECHO - Advanced Scan Suite
 
-# Set the working directory
-WORKDIR /app
-
-# Install system dependencies
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
-    software-properties-common \
-    && add-apt-repository -y universe \
-    && apt-get update && apt-get install -y \
-    git \
-    wget \
-    curl \
-    jq \
-    nmap \
-    libpcap-dev \
-    build-essential \
-    unzip \
-    perl \
-    libnet-ssleay-perl \
-    libio-socket-ssl-perl \
-    libjson-perl \
-    libxml-writer-perl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Nikto from GitHub (latest, with SSL + JSON support)
-RUN git clone https://github.com/sullo/nikto.git /opt/nikto && \
-    ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto && \
-    chmod +x /opt/nikto/program/nikto.pl
-
-# Install Go
-RUN wget -q https://go.dev/dl/go1.25.7.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.25.7.linux-amd64.tar.gz && \
-    rm go1.25.7.linux-amd64.tar.gz
-
-# Set up the PATH for Go
-ENV PATH="/usr/local/go/bin:/usr/local/bin:${PATH}"
-ENV GOPATH="/opt/go"
-ENV PATH="${GOPATH}/bin:${PATH}"
-
-# Install Go tools to /opt/go/bin
-# Install Go tools to /opt/go/bin
-RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
-    go install -v github.com/tomnomnom/assetfinder@latest && \
-    go install -v github.com/owasp-amass/amass/v4/...@latest && \
-    go install -v github.com/tomnomnom/anew@latest && \
-    go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
-    go install -v github.com/lc/gau/v2/cmd/gau@latest && \
-    go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
-    go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
-    go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
-    go install -v github.com/003random/getJS@latest && \
-    go install -v github.com/tomnomnom/waybackurls@latest
-
-# Install findomain
-RUN wget -q https://github.com/Findomain/Findomain/releases/download/10.0.1/findomain-linux.zip && \
-    unzip findomain-linux.zip && \
-    mv findomain /usr/local/bin/ && \
-    rm findomain-linux.zip
-
-# Update Nuclei templates
-RUN nuclei -update-templates
-
-# Make Go binaries accessible to all users
-RUN chmod -R 755 /opt/go
-
-# Build API server (before switching user so we can write binary)
+# ---- Etapa 1: compila a API (Go, somente stdlib) ----
+FROM golang:1.26-bookworm AS api-build
+WORKDIR /src
 COPY go.mod ./
 COPY api/ ./api/
-RUN go build -o /app/api-server ./api
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api-server ./api
 
-# Entrypoint wrapper: "serve" -> API server, else -> recon.sh
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# ---- Etapa 2: imagem final ----
+FROM ubuntu:24.04
 
-# Copy the recon script into the container
-COPY recon.sh .
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TZ=UTC \
+    ECHO_OUTPUT_DIR=/app/output
 
-# Make the script executable
-RUN chmod +x recon.sh
+WORKDIR /app
 
-# Expose API port when running in serve mode
-EXPOSE 8080
+# Ferramentas (versões fixadas em scripts/versions.env)
+COPY scripts/ /app/scripts/
+RUN SKIP_TEMPLATES=1 OPT_DIR=/opt/echo /app/scripts/install.sh \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /root/.cache
 
-# Create a non-privileged user
-RUN useradd -m -u 1000 recon && \
-    chown -R recon:recon /app
+# Usuário sem privilégios (a imagem ubuntu:24.04 já traz o usuário "ubuntu" com UID 1000)
+RUN (userdel -r ubuntu 2>/dev/null || true) && useradd -m -u 1000 recon
 
-# Switch to non-privileged user
+COPY --from=api-build /out/api-server /app/api-server
+COPY entrypoint.sh recon.sh /app/
+COPY report/ /app/report/
+COPY assets/ /app/assets/
+RUN chmod +x /app/entrypoint.sh /app/recon.sh /app/report/echo_report.py \
+    && mkdir -p /app/output && chown -R recon:recon /app
+
 USER recon
+# Templates do Nuclei no HOME do usuário que executa os scans
+RUN nuclei -ut -silent >/dev/null 2>&1 || true
 
-# Set the entrypoint (serve -> API; otherwise -> recon.sh)
+EXPOSE 8080
+VOLUME ["/app/output"]
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD []
+CMD ["--help"]

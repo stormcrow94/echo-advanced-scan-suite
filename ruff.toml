@@ -1,0 +1,9 @@
+line-length = 140
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E731"]
+
+[lint.per-file-ignores]
+"report/i18n.py" = ["E501"]

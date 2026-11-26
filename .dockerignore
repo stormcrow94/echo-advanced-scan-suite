@@ -1,0 +1,7 @@
+.git
+output/
+samples/
+docs/
+*.md
+!README.md
+.github/
