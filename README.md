@@ -58,7 +58,7 @@ export** in English or Brazilian Portuguese. It runs as a CLI, as a Docker image
 | `ports` | [naabu](https://github.com/projectdiscovery/naabu) | Top 100 (standard) / 1000 (deep) ports, connect scan without root, CDN-aware | Yes (rate-limited) |
 | `web` | [httpx](https://github.com/projectdiscovery/httpx) | Live web services, status, title, server, technologies, CDN | Yes |
 | `tls` | [tlsx](https://github.com/projectdiscovery/tlsx) | Certificates: expired, self-signed, hostname mismatch, untrusted, legacy TLS | Yes |
-| `urls` | [gau](https://github.com/lc/gau) | Historical URLs (Wayback, Common Crawl, OTX, URLScan) | No |
+| `urls` | [waymore](https://github.com/xnl-h4ck3r/waymore) | Historical URLs (Wayback, Common Crawl, OTX, URLScan, GhostArchive) | No |
 | `crawl` | [katana](https://github.com/projectdiscovery/katana) | Crawls live sites (depth 3, robots/sitemap, JS parsing, time-boxed) | Yes |
 | `js` | httpx + curl | Finds live JavaScript files and extracts endpoints/URLs | Yes |
 | `nuclei` | [nuclei](https://github.com/projectdiscovery/nuclei) | Misconfiguration, exposure, panels, takeovers, SSL and DNS templates (low+); deep adds the `recommended` profile and info | Yes |
@@ -212,7 +212,7 @@ output/recon-example.com-2026-11-25-120000/
 │   ├── httpx.json           # web probe details
 │   └── alive.txt            # live web URLs
 ├── tls/tlsx.json            # certificate data
-├── urls.txt                 # historical URLs (gau)
+├── urls.txt                 # historical URLs (waymore)
 ├── urls/crawl.txt           # crawled URLs (katana)
 ├── js/js_urls.txt           # live JavaScript files
 ├── js/endpoints.txt         # endpoints extracted from JS
