@@ -272,8 +272,11 @@ def build_model(scan: Path, lang: str, title: str | None, client: str | None,
     for r in read_jsonl(scan / "hosts" / "dns.json"):
         dns.append({"host": r.get("host", ""), "a": r.get("a") or [], "aaaa": r.get("aaaa") or [],
                     "cname": r.get("cname") or []})
-    if not dns:
-        dns = [{"host": h, "a": [], "aaaa": [], "cname": []} for h in read_lines(scan / "hosts" / "resolved.txt")]
+    resolved_set = set(read_lines(scan / "hosts" / "resolved.txt"))
+    if dns:
+        dns = [d for d in dns if d["a"] or d["aaaa"] or d["host"] in resolved_set]
+    else:
+        dns = [{"host": h, "a": [], "aaaa": [], "cname": []} for h in sorted(resolved_set)]
 
     ports = []
     for ln in read_lines(scan / "hosts" / "ports.txt"):
