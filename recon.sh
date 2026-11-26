@@ -479,6 +479,13 @@ if should_run urls gau; then
     echo "$DOMAIN" | timeout 10m gau --subs --threads 5 --timeout 30 \
         --blacklist png,jpg,jpeg,gif,svg,ico,css,woff,woff2,ttf,eot,mp4,webp 2>>"$OUT/urls/errors.log" \
         | head -n "$URLS_MAX" | sort -u > "$URLS"
+    if [[ ! -s "$URLS" ]]; then  # arquivos públicos (Wayback/OTX) oscilam bastante: uma nova tentativa
+        warn "gau não retornou URLs; tentando novamente em 20 s"
+        sleep 20
+        echo "$DOMAIN" | timeout 10m gau --subs --threads 3 --timeout 60 \
+            --blacklist png,jpg,jpeg,gif,svg,ico,css,woff,woff2,ttf,eot,mp4,webp 2>>"$OUT/urls/errors.log" \
+            | head -n "$URLS_MAX" | sort -u > "$URLS"
+    fi
     n=$(count "$URLS")
     if [[ "$n" -gt 0 ]]; then mod_end urls ok "$n URLs (limite ${URLS_MAX})"; else mod_end urls empty "nenhuma URL histórica"; fi
 fi
