@@ -2,6 +2,18 @@
 
 Todas as mudanças relevantes deste projeto. Formato inspirado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2026.11.2] - 2026-11-26
+
+### Corrigido
+- **waymore no Docker**: a instalação como root não usa mais `pip --user` (o usuário `recon` não
+  importava as dependências e o módulo `urls` saía vazio). O pacote vai para um venv compartilhado
+  (`$OPT_DIR/venv`, no Docker `/opt/echo/venv`), com symlink em `$PREFIX/bin` e permissão `a+rX`.
+  O fallback do reportlab como root também instala no Python do sistema, não no user-site.
+- **API**: `OUTPUT_DIR` relativo é resolvido para caminho absoluto antes de passar `--output` e
+  de definir o cwd do `recon.sh`, evitando que os scans gravem em `<output>/<output>/<id>`.
+- **API**: o identificador do scan ganha um sufixo `-nN` se o diretório (ou um scan em execução)
+  já existir no mesmo segundo, para não sobrescrever artefatos de uma execução anterior.
+
 ## [2026.11.1] - 2026-11-26
 
 ### Alterado
