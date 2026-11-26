@@ -1,0 +1,876 @@
+{
+  "schema": "echo-report",
+  "schema_version": "1.0",
+  "generator": {
+    "name": "ECHO Advanced Scan Suite",
+    "version": "2026.11"
+  },
+  "language": "en",
+  "report": {
+    "title": "Reconnaissance & Exposure Assessment",
+    "client": "Example Corp",
+    "author": "ECHO Blue Team",
+    "generated_at": "2026-11-25T22:14:37-03:00"
+  },
+  "scan": {
+    "id": "recon-example.com-2026-11-25-120000",
+    "target": "example.com",
+    "profile": "standard",
+    "status": "completed",
+    "started_at": "2026-11-25T12:00:00-03:00",
+    "finished_at": "2026-11-25T12:20:28-03:00",
+    "duration_seconds": 1228,
+    "rate_limit": 20,
+    "top_ports": 100,
+    "error": null,
+    "tool_version": "2026.11"
+  },
+  "modules": [
+    {
+      "name": "subdomains",
+      "status": "ok",
+      "seconds": 74,
+      "detail": "10 subdomains",
+      "detail_raw": "10 subdomínios (subfinder:9 findomain:8 crt.sh:7)"
+    },
+    {
+      "name": "dns",
+      "status": "ok",
+      "seconds": 12,
+      "detail": "9 resolved hosts",
+      "detail_raw": "9 hosts resolvidos"
+    },
+    {
+      "name": "ports",
+      "status": "ok",
+      "seconds": 95,
+      "detail": "14 open host:port; 1 host(s) answer on almost every port (kept 80/443 only)",
+      "detail_raw": "14 host:porta abertos (scan c, 1 host(s) respondem em ≥80% das portas (filtrados p/ 80,443))"
+    },
+    {
+      "name": "web",
+      "status": "ok",
+      "seconds": 33,
+      "detail": "10 live web URLs",
+      "detail_raw": "10 URLs web ativas"
+    },
+    {
+      "name": "tls",
+      "status": "ok",
+      "seconds": 8,
+      "detail": "4 certificates analysed",
+      "detail_raw": "4 certificados analisados"
+    },
+    {
+      "name": "urls",
+      "status": "ok",
+      "seconds": 41,
+      "detail": "120 historical URLs",
+      "detail_raw": "120 URLs (limite 20000)"
+    },
+    {
+      "name": "crawl",
+      "status": "ok",
+      "seconds": 300,
+      "detail": "40 crawled URLs",
+      "detail_raw": "40 URLs rastreadas"
+    },
+    {
+      "name": "js",
+      "status": "ok",
+      "seconds": 15,
+      "detail": "2 JS files, 4 endpoints",
+      "detail_raw": "2 arquivos JS, 4 endpoints"
+    },
+    {
+      "name": "nuclei",
+      "status": "ok",
+      "seconds": 610,
+      "detail": "8 findings",
+      "detail_raw": "8 achados"
+    }
+  ],
+  "summary": {
+    "subdomains": 10,
+    "resolved_hosts": 9,
+    "open_ports": 14,
+    "web_services": 10,
+    "urls_historical": 120,
+    "urls_crawled": 40,
+    "js_files": 2,
+    "js_endpoints": 4,
+    "tls_certificates": 4,
+    "hosts_all_ports_open": 1,
+    "findings_total": 13,
+    "severity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 5,
+      "low": 1,
+      "info": 6,
+      "unknown": 0
+    },
+    "risk_rating": "high"
+  },
+  "findings": [
+    {
+      "id": "echo-tls-expired",
+      "source": "tlsx",
+      "severity": "high",
+      "name": "Expired TLS certificate",
+      "target": "staging.example.com:443",
+      "description": "The certificate presented by this service has expired; clients will show security warnings.",
+      "remediation": "Renew the certificate with a public CA (e.g. Let's Encrypt) covering every served hostname and disable TLS < 1.2.",
+      "references": [],
+      "tags": [
+        "tls"
+      ],
+      "evidence": [
+        "CN=staging.example.com",
+        "not_after=2026-08-01T00:00:00Z"
+      ],
+      "timestamp": null
+    },
+    {
+      "id": "git-config",
+      "source": "nuclei",
+      "severity": "medium",
+      "name": "Git Configuration - Detect",
+      "target": "https://staging.example.com/.git/config",
+      "description": "Git configuration was detected via the pattern /.git/config and log file on passed URLs.",
+      "remediation": "Block access to /.git on the web server and remove the repository from the web root.",
+      "references": [
+        "https://owasp.org/www-project-top-ten/"
+      ],
+      "tags": [
+        "config",
+        "git",
+        "exposure"
+      ],
+      "evidence": [],
+      "timestamp": "2026-11-25T12:20:00-03:00"
+    },
+    {
+      "id": "echo-tls-old",
+      "source": "tlsx",
+      "severity": "medium",
+      "name": "Legacy TLS protocol version",
+      "target": "vpn.example.com:443",
+      "description": "The service negotiated a TLS version older than 1.2.",
+      "remediation": "Renew the certificate with a public CA (e.g. Let's Encrypt) covering every served hostname and disable TLS < 1.2.",
+      "references": [],
+      "tags": [
+        "tls"
+      ],
+      "evidence": [
+        "CN=fortigate",
+        "not_after=2030-01-01T00:00:00Z"
+      ],
+      "timestamp": null
+    },
+    {
+      "id": "echo-tls-self",
+      "source": "tlsx",
+      "severity": "medium",
+      "name": "Self-signed TLS certificate",
+      "target": "staging.example.com:443",
+      "description": "The certificate is self-signed and is not trusted by browsers.",
+      "remediation": "Renew the certificate with a public CA (e.g. Let's Encrypt) covering every served hostname and disable TLS < 1.2.",
+      "references": [],
+      "tags": [
+        "tls"
+      ],
+      "evidence": [
+        "CN=staging.example.com",
+        "not_after=2026-08-01T00:00:00Z"
+      ],
+      "timestamp": null
+    },
+    {
+      "id": "echo-tls-mismatch",
+      "source": "tlsx",
+      "severity": "medium",
+      "name": "TLS certificate hostname mismatch",
+      "target": "vpn.example.com:443",
+      "description": "The certificate subject/SAN does not match the requested hostname.",
+      "remediation": "Renew the certificate with a public CA (e.g. Let's Encrypt) covering every served hostname and disable TLS < 1.2.",
+      "references": [],
+      "tags": [
+        "tls"
+      ],
+      "evidence": [
+        "CN=fortigate",
+        "not_after=2030-01-01T00:00:00Z"
+      ],
+      "timestamp": null
+    },
+    {
+      "id": "echo-tls-untrusted",
+      "source": "tlsx",
+      "severity": "medium",
+      "name": "Untrusted TLS certificate chain",
+      "target": "vpn.example.com:443",
+      "description": "The certificate chain could not be validated against public trust stores.",
+      "remediation": "Renew the certificate with a public CA (e.g. Let's Encrypt) covering every served hostname and disable TLS < 1.2.",
+      "references": [],
+      "tags": [
+        "tls"
+      ],
+      "evidence": [
+        "CN=fortigate",
+        "not_after=2030-01-01T00:00:00Z"
+      ],
+      "timestamp": null
+    },
+    {
+      "id": "nginx-version",
+      "source": "nuclei",
+      "severity": "low",
+      "name": "Nginx version disclosure",
+      "target": "http://dev.example.com",
+      "description": "",
+      "remediation": "Set server_tokens off.",
+      "references": [],
+      "tags": [
+        "tech",
+        "nginx"
+      ],
+      "evidence": [
+        "nginx/1.18.0"
+      ],
+      "timestamp": "2026-11-25T12:20:00-03:00"
+    },
+    {
+      "id": "dns-caa",
+      "source": "nuclei",
+      "severity": "info",
+      "name": "CAA Record",
+      "target": "example.com",
+      "description": "",
+      "remediation": "",
+      "references": [],
+      "tags": [
+        "dns",
+        "caa"
+      ],
+      "evidence": [],
+      "timestamp": "2026-11-25T12:20:00-03:00"
+    },
+    {
+      "id": "exposed-panel-fortinet",
+      "source": "nuclei",
+      "severity": "info",
+      "name": "Fortinet FortiGate SSL VPN Panel - Detect",
+      "target": "https://vpn.example.com",
+      "description": "",
+      "remediation": "",
+      "references": [],
+      "tags": [
+        "panel",
+        "fortinet"
+      ],
+      "evidence": [],
+      "timestamp": "2026-11-25T12:20:00-03:00"
+    },
+    {
+      "id": "grafana-detect",
+      "source": "nuclei",
+      "severity": "info",
+      "name": "Grafana Detect",
+      "target": "http://dev.example.com:3000/login",
+      "description": "",
+      "remediation": "",
+      "references": [],
+      "tags": [
+        "tech",
+        "grafana"
+      ],
+      "evidence": [
+        "9.1.0"
+      ],
+      "timestamp": "2026-11-25T12:20:00-03:00"
+    },
+    {
+      "id": "http-missing-security-headers",
+      "source": "nuclei",
+      "severity": "info",
+      "name": "HTTP Missing Security Headers",
+      "target": "https://www.example.com",
+      "description": "",
+      "remediation": "",
+      "references": [],
+      "tags": [
+        "misconfig",
+        "headers"
+      ],
+      "evidence": [
+        "content-security-policy",
+        "permissions-policy"
+      ],
+      "timestamp": "2026-11-25T12:20:00-03:00"
+    },
+    {
+      "id": "swagger-api",
+      "source": "nuclei",
+      "severity": "info",
+      "name": "Public Swagger API - Detect",
+      "target": "https://api.example.com:8443/swagger-ui/index.html",
+      "description": "",
+      "remediation": "",
+      "references": [],
+      "tags": [
+        "exposure",
+        "api",
+        "swagger"
+      ],
+      "evidence": [],
+      "timestamp": "2026-11-25T12:20:00-03:00"
+    },
+    {
+      "id": "wordpress-detect",
+      "source": "nuclei",
+      "severity": "info",
+      "name": "WordPress Detect",
+      "target": "https://www.example.com",
+      "description": "",
+      "remediation": "",
+      "references": [],
+      "tags": [
+        "tech",
+        "wordpress"
+      ],
+      "evidence": [
+        "6.6"
+      ],
+      "timestamp": "2026-11-25T12:20:00-03:00"
+    }
+  ],
+  "assets": {
+    "subdomains": [
+      "example.com",
+      "www.example.com",
+      "api.example.com",
+      "mail.example.com",
+      "dev.example.com",
+      "staging.example.com",
+      "vpn.example.com",
+      "old.example.com",
+      "cdn.example.com",
+      "status.example.com"
+    ],
+    "dns": [
+      {
+        "host": "example.com",
+        "a": [
+          "192.0.2.10"
+        ],
+        "aaaa": [],
+        "cname": []
+      },
+      {
+        "host": "www.example.com",
+        "a": [
+          "192.0.2.11"
+        ],
+        "aaaa": [],
+        "cname": []
+      },
+      {
+        "host": "api.example.com",
+        "a": [
+          "192.0.2.12"
+        ],
+        "aaaa": [],
+        "cname": []
+      },
+      {
+        "host": "mail.example.com",
+        "a": [
+          "192.0.2.13"
+        ],
+        "aaaa": [],
+        "cname": []
+      },
+      {
+        "host": "dev.example.com",
+        "a": [
+          "192.0.2.14"
+        ],
+        "aaaa": [],
+        "cname": []
+      },
+      {
+        "host": "staging.example.com",
+        "a": [
+          "192.0.2.15"
+        ],
+        "aaaa": [],
+        "cname": []
+      },
+      {
+        "host": "vpn.example.com",
+        "a": [
+          "192.0.2.16"
+        ],
+        "aaaa": [],
+        "cname": []
+      },
+      {
+        "host": "cdn.example.com",
+        "a": [
+          "192.0.2.18"
+        ],
+        "aaaa": [],
+        "cname": []
+      },
+      {
+        "host": "status.example.com",
+        "a": [
+          "192.0.2.19"
+        ],
+        "aaaa": [],
+        "cname": []
+      }
+    ],
+    "ports": [
+      {
+        "host": "api.example.com",
+        "port": 443
+      },
+      {
+        "host": "api.example.com",
+        "port": 8443
+      },
+      {
+        "host": "dev.example.com",
+        "port": 22
+      },
+      {
+        "host": "dev.example.com",
+        "port": 80
+      },
+      {
+        "host": "dev.example.com",
+        "port": 3000
+      },
+      {
+        "host": "example.com",
+        "port": 443
+      },
+      {
+        "host": "mail.example.com",
+        "port": 25
+      },
+      {
+        "host": "mail.example.com",
+        "port": 443
+      },
+      {
+        "host": "mail.example.com",
+        "port": 993
+      },
+      {
+        "host": "staging.example.com",
+        "port": 443
+      },
+      {
+        "host": "status.example.com",
+        "port": 443
+      },
+      {
+        "host": "vpn.example.com",
+        "port": 443
+      },
+      {
+        "host": "www.example.com",
+        "port": 80
+      },
+      {
+        "host": "www.example.com",
+        "port": 443
+      }
+    ],
+    "ports_all_open_hosts": [
+      "cdn.example.com"
+    ],
+    "web": [
+      {
+        "url": "http://dev.example.com",
+        "status_code": 200,
+        "title": "Welcome to nginx!",
+        "webserver": "Nginx:1.18.0",
+        "technologies": [
+          "Nginx:1.18.0"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      },
+      {
+        "url": "http://dev.example.com:3000",
+        "status_code": 200,
+        "title": "Grafana",
+        "webserver": "Grafana:9.1.0",
+        "technologies": [
+          "Grafana:9.1.0"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      },
+      {
+        "url": "https://api.example.com",
+        "status_code": 401,
+        "title": "",
+        "webserver": "Envoy",
+        "technologies": [
+          "Envoy"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      },
+      {
+        "url": "https://api.example.com:8443",
+        "status_code": 200,
+        "title": "Swagger UI",
+        "webserver": "Swagger UI",
+        "technologies": [
+          "Swagger UI",
+          "Java"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      },
+      {
+        "url": "https://example.com",
+        "status_code": 200,
+        "title": "Example Corp",
+        "webserver": "Nginx",
+        "technologies": [
+          "Nginx",
+          "HSTS"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      },
+      {
+        "url": "https://mail.example.com",
+        "status_code": 200,
+        "title": "Outlook Web App",
+        "webserver": "Microsoft Exchange",
+        "technologies": [
+          "Microsoft Exchange",
+          "IIS:10.0"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      },
+      {
+        "url": "https://staging.example.com",
+        "status_code": 200,
+        "title": "Example Corp (staging)",
+        "webserver": "Nginx",
+        "technologies": [
+          "Nginx",
+          "React"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      },
+      {
+        "url": "https://status.example.com",
+        "status_code": 200,
+        "title": "Status",
+        "webserver": "Cloudflare",
+        "technologies": [
+          "Cloudflare"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      },
+      {
+        "url": "https://vpn.example.com",
+        "status_code": 200,
+        "title": "SSL VPN",
+        "webserver": "Fortinet FortiGate",
+        "technologies": [
+          "Fortinet FortiGate"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      },
+      {
+        "url": "https://www.example.com",
+        "status_code": 200,
+        "title": "Example Corp - Home",
+        "webserver": "Nginx",
+        "technologies": [
+          "Nginx",
+          "WordPress:6.6",
+          "PHP:8.2"
+        ],
+        "ip": "192.0.2.50",
+        "cdn": "",
+        "location": ""
+      }
+    ],
+    "tls": [
+      {
+        "host": "example.com",
+        "port": "443",
+        "tls_version": "tls13",
+        "subject_cn": "example.com",
+        "subject_an": [],
+        "issuer": [
+          "Let's Encrypt"
+        ],
+        "not_after": "2027-02-01T00:00:00Z",
+        "expired": false,
+        "self_signed": false,
+        "mismatched": false,
+        "untrusted": false,
+        "flags": []
+      },
+      {
+        "host": "staging.example.com",
+        "port": "443",
+        "tls_version": "tls12",
+        "subject_cn": "staging.example.com",
+        "subject_an": [],
+        "issuer": [
+          "Example Internal CA"
+        ],
+        "not_after": "2026-08-01T00:00:00Z",
+        "expired": true,
+        "self_signed": true,
+        "mismatched": false,
+        "untrusted": false,
+        "flags": [
+          "expired",
+          "self-signed"
+        ]
+      },
+      {
+        "host": "vpn.example.com",
+        "port": "443",
+        "tls_version": "tls11",
+        "subject_cn": "fortigate",
+        "subject_an": [],
+        "issuer": [
+          "Fortinet"
+        ],
+        "not_after": "2030-01-01T00:00:00Z",
+        "expired": false,
+        "self_signed": false,
+        "mismatched": true,
+        "untrusted": true,
+        "flags": [
+          "hostname mismatch",
+          "untrusted",
+          "legacy TLS"
+        ]
+      },
+      {
+        "host": "mail.example.com",
+        "port": "443",
+        "tls_version": "tls12",
+        "subject_cn": "mail.example.com",
+        "subject_an": [],
+        "issuer": [
+          "DigiCert Inc"
+        ],
+        "not_after": "2027-05-10T00:00:00Z",
+        "expired": false,
+        "self_signed": false,
+        "mismatched": false,
+        "untrusted": false,
+        "flags": []
+      }
+    ]
+  },
+  "urls": {
+    "historical": [
+      "https://www.example.com/page/0?id=0",
+      "https://www.example.com/page/1?id=1",
+      "https://www.example.com/page/2?id=2",
+      "https://www.example.com/page/3?id=3",
+      "https://www.example.com/page/4?id=4",
+      "https://www.example.com/page/5?id=5",
+      "https://www.example.com/page/6?id=6",
+      "https://www.example.com/page/7?id=7",
+      "https://www.example.com/page/8?id=8",
+      "https://www.example.com/page/9?id=9",
+      "https://www.example.com/page/10?id=10",
+      "https://www.example.com/page/11?id=11",
+      "https://www.example.com/page/12?id=12",
+      "https://www.example.com/page/13?id=13",
+      "https://www.example.com/page/14?id=14",
+      "https://www.example.com/page/15?id=15",
+      "https://www.example.com/page/16?id=16",
+      "https://www.example.com/page/17?id=17",
+      "https://www.example.com/page/18?id=18",
+      "https://www.example.com/page/19?id=19",
+      "https://www.example.com/page/20?id=20",
+      "https://www.example.com/page/21?id=21",
+      "https://www.example.com/page/22?id=22",
+      "https://www.example.com/page/23?id=23",
+      "https://www.example.com/page/24?id=24",
+      "https://www.example.com/page/25?id=25",
+      "https://www.example.com/page/26?id=26",
+      "https://www.example.com/page/27?id=27",
+      "https://www.example.com/page/28?id=28",
+      "https://www.example.com/page/29?id=29",
+      "https://www.example.com/page/30?id=30",
+      "https://www.example.com/page/31?id=31",
+      "https://www.example.com/page/32?id=32",
+      "https://www.example.com/page/33?id=33",
+      "https://www.example.com/page/34?id=34",
+      "https://www.example.com/page/35?id=35",
+      "https://www.example.com/page/36?id=36",
+      "https://www.example.com/page/37?id=37",
+      "https://www.example.com/page/38?id=38",
+      "https://www.example.com/page/39?id=39",
+      "https://www.example.com/page/40?id=40",
+      "https://www.example.com/page/41?id=41",
+      "https://www.example.com/page/42?id=42",
+      "https://www.example.com/page/43?id=43",
+      "https://www.example.com/page/44?id=44",
+      "https://www.example.com/page/45?id=45",
+      "https://www.example.com/page/46?id=46",
+      "https://www.example.com/page/47?id=47",
+      "https://www.example.com/page/48?id=48",
+      "https://www.example.com/page/49?id=49",
+      "https://www.example.com/page/50?id=50",
+      "https://www.example.com/page/51?id=51",
+      "https://www.example.com/page/52?id=52",
+      "https://www.example.com/page/53?id=53",
+      "https://www.example.com/page/54?id=54",
+      "https://www.example.com/page/55?id=55",
+      "https://www.example.com/page/56?id=56",
+      "https://www.example.com/page/57?id=57",
+      "https://www.example.com/page/58?id=58",
+      "https://www.example.com/page/59?id=59",
+      "https://www.example.com/page/60?id=60",
+      "https://www.example.com/page/61?id=61",
+      "https://www.example.com/page/62?id=62",
+      "https://www.example.com/page/63?id=63",
+      "https://www.example.com/page/64?id=64",
+      "https://www.example.com/page/65?id=65",
+      "https://www.example.com/page/66?id=66",
+      "https://www.example.com/page/67?id=67",
+      "https://www.example.com/page/68?id=68",
+      "https://www.example.com/page/69?id=69",
+      "https://www.example.com/page/70?id=70",
+      "https://www.example.com/page/71?id=71",
+      "https://www.example.com/page/72?id=72",
+      "https://www.example.com/page/73?id=73",
+      "https://www.example.com/page/74?id=74",
+      "https://www.example.com/page/75?id=75",
+      "https://www.example.com/page/76?id=76",
+      "https://www.example.com/page/77?id=77",
+      "https://www.example.com/page/78?id=78",
+      "https://www.example.com/page/79?id=79",
+      "https://www.example.com/page/80?id=80",
+      "https://www.example.com/page/81?id=81",
+      "https://www.example.com/page/82?id=82",
+      "https://www.example.com/page/83?id=83",
+      "https://www.example.com/page/84?id=84",
+      "https://www.example.com/page/85?id=85",
+      "https://www.example.com/page/86?id=86",
+      "https://www.example.com/page/87?id=87",
+      "https://www.example.com/page/88?id=88",
+      "https://www.example.com/page/89?id=89",
+      "https://www.example.com/page/90?id=90",
+      "https://www.example.com/page/91?id=91",
+      "https://www.example.com/page/92?id=92",
+      "https://www.example.com/page/93?id=93",
+      "https://www.example.com/page/94?id=94",
+      "https://www.example.com/page/95?id=95",
+      "https://www.example.com/page/96?id=96",
+      "https://www.example.com/page/97?id=97",
+      "https://www.example.com/page/98?id=98",
+      "https://www.example.com/page/99?id=99",
+      "https://www.example.com/page/100?id=100",
+      "https://www.example.com/page/101?id=101",
+      "https://www.example.com/page/102?id=102",
+      "https://www.example.com/page/103?id=103",
+      "https://www.example.com/page/104?id=104",
+      "https://www.example.com/page/105?id=105",
+      "https://www.example.com/page/106?id=106",
+      "https://www.example.com/page/107?id=107",
+      "https://www.example.com/page/108?id=108",
+      "https://www.example.com/page/109?id=109",
+      "https://www.example.com/page/110?id=110",
+      "https://www.example.com/page/111?id=111",
+      "https://www.example.com/page/112?id=112",
+      "https://www.example.com/page/113?id=113",
+      "https://www.example.com/page/114?id=114",
+      "https://www.example.com/page/115?id=115",
+      "https://www.example.com/page/116?id=116",
+      "https://www.example.com/page/117?id=117",
+      "https://www.example.com/page/118?id=118",
+      "https://www.example.com/page/119?id=119"
+    ],
+    "crawled": [
+      "https://www.example.com/blog/0",
+      "https://www.example.com/blog/1",
+      "https://www.example.com/blog/2",
+      "https://www.example.com/blog/3",
+      "https://www.example.com/blog/4",
+      "https://www.example.com/blog/5",
+      "https://www.example.com/blog/6",
+      "https://www.example.com/blog/7",
+      "https://www.example.com/blog/8",
+      "https://www.example.com/blog/9",
+      "https://www.example.com/blog/10",
+      "https://www.example.com/blog/11",
+      "https://www.example.com/blog/12",
+      "https://www.example.com/blog/13",
+      "https://www.example.com/blog/14",
+      "https://www.example.com/blog/15",
+      "https://www.example.com/blog/16",
+      "https://www.example.com/blog/17",
+      "https://www.example.com/blog/18",
+      "https://www.example.com/blog/19",
+      "https://www.example.com/blog/20",
+      "https://www.example.com/blog/21",
+      "https://www.example.com/blog/22",
+      "https://www.example.com/blog/23",
+      "https://www.example.com/blog/24",
+      "https://www.example.com/blog/25",
+      "https://www.example.com/blog/26",
+      "https://www.example.com/blog/27",
+      "https://www.example.com/blog/28",
+      "https://www.example.com/blog/29",
+      "https://www.example.com/blog/30",
+      "https://www.example.com/blog/31",
+      "https://www.example.com/blog/32",
+      "https://www.example.com/blog/33",
+      "https://www.example.com/blog/34",
+      "https://www.example.com/blog/35",
+      "https://www.example.com/blog/36",
+      "https://www.example.com/blog/37",
+      "https://www.example.com/blog/38",
+      "https://www.example.com/blog/39"
+    ]
+  },
+  "javascript": {
+    "files": [
+      "https://www.example.com/static/app.js",
+      "https://staging.example.com/main.js"
+    ],
+    "endpoints": [
+      "/api/v1/users",
+      "/api/v1/orders",
+      "/graphql",
+      "/internal/health"
+    ]
+  }
+}

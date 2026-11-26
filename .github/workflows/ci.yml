@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck
+        run: shellcheck -x recon.sh entrypoint.sh scripts/install.sh
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - name: Go vet / test / build
+        run: |
+          test -z "$(gofmt -l api/)"
+          go vet ./api/...
+          go test ./api/...
+          go build -o /dev/null ./api
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ruff + report smoke test
+        run: |
+          pip install ruff reportlab pillow
+          ruff check report/ tests/
+          python3 tests/make_fixture.py /tmp/fx
+          python3 report/echo_report.py --scan-dir /tmp/fx/recon-example.com-2026-11-25-120000 --lang both --format both
+          python3 -c "import json; d=json.load(open('/tmp/fx/recon-example.com-2026-11-25-120000/report/report-en.json')); assert d['schema']=='echo-report' and d['summary']['findings_total']>0"
+
+      - name: recon.sh dry-run
+        run: ./recon.sh -d example.com --dry-run --no-banner
+
+  docker:
+    runs-on: ubuntu-24.04
+    needs: lint-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t echo-scanner:ci .
+      - name: Smoke test
+        run: |
+          docker run --rm echo-scanner:ci --version
+          docker run --rm echo-scanner:ci --check-deps --no-banner
